@@ -19,14 +19,12 @@ echo "============="
 
 DIRS=$(echo "$TOP_40" | $GREP -o -E 'file [^/]+' | sort | uniq | cut -f 2 -d ' ')
 for DIR in $DIRS; do 
-  WARNINGS=$(echo "$TOP_40" | $GREP "file $DIR" | sort -brn)
-  TALLY=$(echo "$WARNINGS" | cut -f 1 -d ' '  | paste -s -d '+' - | bc)
+  WARNINGS="$(echo "$TOP_40" | $GREP "file $DIR" | sort -brn)"
+  TALLY=$(echo "$WARNINGS" | sed -e 's/^[[:space:]]*//' | cut -f 1 -d ' '  | paste -s -d '+' - | bc)
 
   echo "$DIR ($TALLY)"
-  IFS='
-'
-  for WARNING in $WARNINGS; do
-    echo "  $WARNING"
+  for WARNING in "$WARNINGS"; do
+    echo "$WARNING"
   done
   echo ""
 done

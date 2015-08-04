@@ -9,6 +9,9 @@
 #
 # Example usage:
 # warning_details.sh "4532 [NNNNN] WARNING: Shouldn't call SchedulePaint in a detached pres context: file layout/generic/nsFrame.cpp, line 5195"
+
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
 WARNING=$1
 
 WARNING_TEXT=$(echo "$WARNING" | sed -E -e 's/([0-9]+).*WARNING: (.*)[:,] file ([^,]+), line ([0-9]+).*/\2/')
@@ -37,7 +40,7 @@ WARNING_COUNTS="$(grep -c "$JUST_WARNING" *.txt | sort -brn -k 2 -t ':' | grep -
 WARNING_FILES=$(echo "$WARNING_COUNTS" | cut -d ':' -f 1)
 
 # Get tests w/ warning
-TESTS="$(cat $WARNING_FILES | python ../assertion_length.py "$JUST_WARNING" | sort -brn)"
+TESTS="$(cat $WARNING_FILES | python "$SCRIPT_DIR/warning_locations.py" "$JUST_WARNING" | sort -brn)"
 TOTAL_TESTS=$(echo "$TESTS" | wc -l)
 
 # Print bug text

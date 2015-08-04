@@ -1,8 +1,16 @@
 #!/bin/bash
 
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Given a warning summary from rankings.sh this will spit out a summary
+# suitable for filing a bug.
+#
+# Example usage:
+# warning_details.sh "4532 [NNNNN] WARNING: Shouldn't call SchedulePaint in a detached pres context: file layout/generic/nsFrame.cpp, line 5195"
 WARNING=$1
 
-# 4532 [NNNNN] WARNING: Shouldn't call SchedulePaint in a detached pres context: file layout/generic/nsFrame.cpp, line 5195
 WARNING_TEXT=$(echo "$WARNING" | sed -E -e 's/([0-9]+).*WARNING: (.*)[:,] file ([^,]+), line ([0-9]+).*/\2/')
 WARNING_FILE=$(echo "$WARNING" | sed -E -e 's/([0-9]+).*WARNING: (.*)[:,] file ([^,]+), line ([0-9]+).*/\3/')
 WARNING_LINE=$(echo "$WARNING" | sed -E -e 's/([0-9]+).*WARNING: (.*)[:,] file ([^,]+), line ([0-9]+).*/\4/')
@@ -10,8 +18,8 @@ WARNING_COUNT=$(echo "$WARNING" | sed -E -e 's/([0-9]+).*WARNING: (.*)[:,] file 
 
 JUST_WARNING=$(echo "$WARNING" | sed -E -e 's/[0-9]+.*WARNING: //')
 
-echo "WARNING = $WARNING_TEXT"
-echo "LOCATION = $WARNING_FILE:$WARNING_LINE"
+#echo "WARNING = $WARNING_TEXT"
+#echo "LOCATION = $WARNING_FILE:$WARNING_LINE"
 
 # round to 100s
 WARNING_COUNT=$((WARNING_COUNT + 50))
@@ -49,7 +57,8 @@ TOP_10="$(echo "$TESTS" | head -n10 | sed -e 's/^/> /')"
 echo "$TOP_10"
 echo ""
 
+#TODO(ER): Don't hardcode the m-c checkout or find a better way to get the ID
 HG_ID=$(hg -R ~/dev/mozilla-central/ id | cut -d ' ' -f 1)
 
-#TODO(ER): fudge the line by grepping for it in the local checkout
+#TODO(ER): Fudge the line by grepping for it in the local checkout
 echo "[1] https://hg.mozilla.org/mozilla-central/annotate/$HG_ID/$WARNING_FILE#l$WARNING_LINE"

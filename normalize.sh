@@ -33,6 +33,7 @@ normalize_file()
 {
   file=$1
   $SED -E -e 's/^[0-9:]+[[:space:]]+INFO[[:space:]]+-[[:space:]]+//g'         \
+          -e 's/^PROCESS \| [0-9]+ \| //g'                                    \
           -e 's/\[(Child|Parent|GMP|NPAPI)?[[:space:]]?[0-9]+\]/\[NNNNN\]/g'  \
           -e 's/file (\/builds\/.*\/build\/src\/)([^[:space:]]+)/file \2/g'   \
           -e 's/file (\/builds\/.*\/build\/gecko\/)([^[:space:]]+)/file \2/g' \

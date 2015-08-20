@@ -34,7 +34,7 @@ def findTestsWithText(text):
     print_sorted_dict(warningCounts)
 
 if __name__ == "__main__":
-    if sys.argc > 1:
+    if len(sys.argv) > 1:
         findTestsWithText(sys.argv[1])
     else:
         print "Usage: warning_locations.py \"WARNING: Don't do that! file/path/blah\"" 

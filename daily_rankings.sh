@@ -9,6 +9,23 @@
 # - Normalizes them
 # - Runs top 40 on them
 
+# Deal w/ BSD vs GNU
+case "$(uname -s)" in
+  Darwin|*BSD)
+    BSD=1
+    ;;
+
+  Linux)
+    BSD=0
+    ;;
+
+  *)
+    echo "untested platform"
+    BSD=0
+    ;;
+esac
+
+
 SCRIPT_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 FILE=$1
 
@@ -19,7 +36,12 @@ fi
 
 TIMESTAMP=`basename ${FILE}`
 
-DATE=`date -d @$TIMESTAMP +%Y-%m-%d`
+if [ $BSD -eq 1 ]; then
+  DATE=`date -j -f '%s' $TIMESTAMP  +%Y-%m-%d`
+else
+  DATE=`date -d @$TIMESTAMP +%Y-%m-%d`
+fi
+
 mkdir $DATE
 cd $DATE
 

@@ -6,9 +6,25 @@
 
 from multiprocessing import Pool
 import pprint
+import re
 
 import requests
 from thclient import TreeherderClient
+
+
+def normalize_line(line):
+    """
+    Normalizes the given line to make comparisons easier. Removes:
+      - timestamps
+      - pids
+      - trims file paths
+    """
+    line = re.sub(r'^[0-9:]+\s+INFO\s+-\s+', '', line)
+    line = re.sub(r'^PROCESS \| [0-9]+ \| ', '', line)
+    line = re.sub(r'\[(Child|Parent|GMP|NPAPI)?\s?[0-9]+\]', '[NNNNN]', line)
+    line = re.sub(r'/home/worker/workspace/build/src/', '', line)
+
+    return line
 
 
 def download_log(job):
@@ -24,13 +40,15 @@ def download_log(job):
 
     client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
     job_log = client.get_job_log_url('mozilla-central', job_id=job_id)
+
     job_log_url = job_log[0]['url']
     job_log_name = job_name.replace(' ', '_') + '.log'
+
     r = requests.get(job_log_url, stream=True)
-    with open(job_log_name, 'wb') as f:
-        for x in r.iter_content(4096):
+    with open(job_log_name, 'w') as f:
+        for x in r.iter_lines():
             if x:
-                f.write(x)
+                f.write(normalize_line(x) + '\n')
 
     return job_log_name
 
@@ -38,15 +56,18 @@ def download_log(job):
 def main():
     client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
     result_set = client.get_resultsets('mozilla-central', revision='ae7413abfa4d3954a6a4ce7c1613a7100f367f9a')
-    pprint.pprint(result_set)
 
-    jobs = client.get_jobs('mozilla-central', result_set_id=result_set[0]['id'], count=5000)
+    # We just want linux64 debug builds:
+    #   - platform='linux64'
+    #   - Crazytown param for debug: option_collection_hash=32faaecac742100f7753f0c1d0aa0add01b4046b
+    jobs = client.get_jobs('mozilla-central',
+                           result_set_id=result_set[0]['id'],
+                           count=5000, # Just make this really large to avoid pagination
+                           platform='linux64',
+                           option_collection_hash='32faaecac742100f7753f0c1d0aa0add01b4046b')
     print "Found %d jobs" % len(jobs)
-    jobs = [ job for job in jobs if job['platform_option'] == 'debug' and job['platform'] == 'linux64' ]
 
-    print "Filtered to %d logs" % len(jobs)
-
-    pool = Pool(processes=8)
+    pool = Pool(processes=12)
     files = pool.map(download_log, jobs)
     pool.close()
 

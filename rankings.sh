@@ -6,7 +6,7 @@
 # Use GNU grep (ggrep) on OSX if it's installed
 GREP=`which ggrep || which grep`
 
-TOP_40=$($GREP -h 'WARNING' *.txt | sort | uniq -c | sort -brn | head -n40)
+TOP_40=$($GREP -h 'WARNING' *.log | sort | uniq -c | sort -brn | head -n40)
 
 echo "TOP 40"
 echo "======"

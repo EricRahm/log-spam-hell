@@ -36,7 +36,7 @@ printf "%'d instances of \"%s\" emitted from %s during linux64 debug testing\n" 
 	"$WARNING_FILE"
 
 # Get files w/ warning and counts
-WARNING_COUNTS="$(grep -c "$JUST_WARNING" *.txt | sort -brn -k 2 -t ':' | grep -v ':0')"
+WARNING_COUNTS="$(grep -c "$JUST_WARNING" *.log | sort -brn -k 2 -t ':' | grep -v ':0')"
 WARNING_FILES=$(echo "$WARNING_COUNTS" | cut -d ':' -f 1)
 
 # Get tests w/ warning

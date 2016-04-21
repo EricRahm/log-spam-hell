@@ -36,10 +36,10 @@ def download_log(job):
     job_id = job['id']
     job_name = job['job_type_name']
 
-    print "Downloading log for %s" % job_name
+    print "Downloading log for %s %d" % (job_name, job_id)
 
     client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
-    job_log = client.get_job_log_url('mozilla-central', job_id=job_id)
+    job_log = client.get_job_log_url('try', job_id=job_id)
 
     job_log_url = job_log[0]['url']
     job_log_name = job_name.replace(' ', '_') + '.log'
@@ -55,12 +55,12 @@ def download_log(job):
 
 def main():
     client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
-    result_set = client.get_resultsets('mozilla-central', revision='ae7413abfa4d3954a6a4ce7c1613a7100f367f9a')
+    result_set = client.get_resultsets('try', revision='e4d695e4884f2ce1365e8cc3d1ae4402cce4919a')
 
     # We just want linux64 debug builds:
     #   - platform='linux64'
     #   - Crazytown param for debug: option_collection_hash=32faaecac742100f7753f0c1d0aa0add01b4046b
-    jobs = client.get_jobs('mozilla-central',
+    jobs = client.get_jobs('try',
                            result_set_id=result_set[0]['id'],
                            count=5000, # Just make this really large to avoid pagination
                            platform='linux64',

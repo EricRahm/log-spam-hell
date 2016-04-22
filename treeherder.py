@@ -97,6 +97,9 @@ def download_log(job, dest, repo, revision):
 
 
 class CustomEncoder(json.JSONEncoder):
+    """
+    Custom JSON encoder that handles ParsedLog objects.
+    """
     def default(self, obj):
         if isinstance(obj, ParsedLog):
             return obj.to_json()
@@ -104,13 +107,19 @@ class CustomEncoder(json.JSONEncoder):
 
 
 def cache_results(dest, parsed_logs):
+    """
+    Caches the parsed results in a json file.
+    """
     fname = os.path.join(dest, "results.json")
     with open(fname, 'w') as f:
         json.dump(parsed_logs, f, cls=CustomEncoder)
 
 
-def read_cached_results(dest):
-    fname = os.path.join(dest, "results.json")
+def read_cached_results(cache_dir):
+    """
+    Reads the cached results from a previous run.
+    """
+    fname = os.path.join(cache_dir, "results.json")
     parsed_logs = []
     with open(fname, 'r') as f:
         raw_list = json.load(f)
@@ -132,7 +141,7 @@ def add_arguments(p):
                    help='Revision to retrieve logs for.')
     p.add_argument('--no-cache', action='store_false', default=True, dest='use_cache',
                    help='Redownload logs if already present.')
-    p.add_argument('--dest-dir', action='store', default=None,
+    p.add_argument('--cache-dir', action='store', default=None,
                    help='Directory to cache logs to. Default: <repo>-<revision>')
 
 
@@ -141,15 +150,15 @@ def main():
     add_arguments(parser)
     cmdline = parser.parse_args()
 
-    dest_dir = cmdline.dest_dir
-    if not dest_dir:
-        dest_dir = "%s-%s" % (cmdline.repo, cmdline.revision)
+    cache_dir = cmdline.cache_dir
+    if not cache_dir:
+        cache_dir = "%s-%s" % (cmdline.repo, cmdline.revision)
 
-    dest_dir_exists = os.path.isdir(dest_dir)
-    if dest_dir_exists and cmdline.use_cache:
+    cache_dir_exists = os.path.isdir(cache_dir)
+    if cache_dir_exists and cmdline.use_cache:
         # We already have logs for this revision.
         print "Using cached data"
-        files = read_cached_results(dest_dir)
+        files = read_cached_results(cache_dir)
     else:
         client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
         result_set = client.get_resultsets(cmdline.repo, revision=cmdline.revision)
@@ -163,18 +172,19 @@ def main():
                                platform='linux64',
                                option_collection_hash=DEBUG_OPTIONHASH)
         print "Found %d jobs" % len(jobs)
-        if dest_dir_exists:
-            shutil.rmtree(dest_dir)
-        os.mkdir(dest_dir)
+        if cache_dir_exists:
+            shutil.rmtree(cache_dir)
+        os.mkdir(cache_dir)
 
-        partial_download_log = partial(download_log, dest=dest_dir,
+        # Bind fixed arguments to the |download_log| call.
+        partial_download_log = partial(download_log, dest=cache_dir,
                                       repo=cmdline.repo, revision=cmdline.revision)
 
         pool = Pool(processes=12)
         files = pool.map(partial_download_log, jobs)
         pool.close()
 
-        cache_results(dest_dir, files)
+        cache_results(cache_dir, files)
 
     combined_warnings = Counter()
     for log in files:

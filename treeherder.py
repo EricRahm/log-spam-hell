@@ -30,6 +30,9 @@ def normalize_line(line):
     line = re.sub(r'^PROCESS \| [0-9]+ \| ', '', line)
     line = re.sub(r'\[(Child|Parent|GMP|NPAPI)?\s?[0-9]+\]', '', line)
     line = re.sub(r'/home/worker/workspace/build/src/', '', line)
+    # Attempt buildbot paths, ie:
+    #  c:/builds/moz2_slave/m-cen-w32-d-000000000000000000/build/src/
+    line = re.sub(r'([a-z]:)?/builds/[^/]+/[^/]+/build/src/', '', line)
     line = line.strip()
 
     return line
@@ -88,13 +91,14 @@ class WarningInfo:
             elif not self.tests:
                 print "No warnings matched?"
 
-    def print_details(self, repo, revision, test_count=10):
+    def print_details(self, repo, revision, platform='linux64', test_count=10):
         rounded = int(round(self.count) / 100) * 100
         print "%s instances of \"%s\" emitted from %s " \
-              "during linux64 debug testing" % (
+              "during %s debug testing" % (
                       '{:,}'.format(rounded),
                       self.text,
-                      self.file)
+                      self.file,
+                      platform)
         print ""
         print "> %d %s" % (self.count, self.full_text)
         print ""
@@ -166,6 +170,8 @@ def download_log(job, dest, repo, revision):
     """
     job_id = job['id']
     job_name = job['job_type_name']
+    if job['job_type_symbol']:
+        job_name += " " + job['job_type_symbol'] # Needed for jobs without unique names
 
     print "Downloading log for %s %d" % (job_name, job_id)
 
@@ -230,6 +236,8 @@ def add_arguments(p):
                    help='Number of warnings to show in the default summary. Default: 40')
     p.add_argument('--test-summary-count', action='store', default=10, type=int,
                    help='Number of tests to list in warning summary mode. Default: 10')
+    p.add_argument('--platform', action='store', default='linux64',
+                   help='Platform to get logs for. Default: linux64')
 
 
 def main():
@@ -256,9 +264,9 @@ def main():
         jobs = client.get_jobs(cmdline.repo,
                                result_set_id=result_set[0]['id'],
                                count=5000, # Just make this really large to avoid pagination
-                               platform='linux64',
+                               platform=cmdline.platform,
                                option_collection_hash=DEBUG_OPTIONHASH)
-        print "Found %d jobs" % len(jobs)
+
         if cache_dir_exists:
             shutil.rmtree(cache_dir)
         os.mkdir(cache_dir)
@@ -287,7 +295,7 @@ def main():
     else:
         details = WarningInfo(cmdline.warning, combined_warnings[cmdline.warning])
         details.match_in_logs(cache_dir, files)
-        details.print_details(cmdline.repo, cmdline.revision, cmdline.test_summary_count)
+        details.print_details(cmdline.repo, cmdline.revision, cmdline.platform, cmdline.test_summary_count)
 
 
 if __name__ == '__main__':

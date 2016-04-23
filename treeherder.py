@@ -25,6 +25,7 @@ def normalize_line(line):
       - timestamps
       - pids
       - trims file paths
+      - stuff that looks like a pointer address
     """
     line = re.sub(r'^[0-9:]+\s+INFO\s+-\s+', '', line)
     line = re.sub(r'^PROCESS \| [0-9]+ \| ', '', line)
@@ -33,6 +34,8 @@ def normalize_line(line):
     # Attempt buildbot paths, ie:
     #  c:/builds/moz2_slave/m-cen-w32-d-000000000000000000/build/src/
     line = re.sub(r'([a-z]:)?/builds/[^/]+/[^/]+/build/src/', '', line)
+    #blah=1caa2c00
+    line = re.sub(r'=[a-z0-9]+', '=NNNNNN', line)
     line = line.strip()
 
     return line
@@ -147,7 +150,7 @@ class ParsedLog:
         """
         Adds the line to the set of warnings if it contains a warning.
         """
-        if 'WARNING' in line:
+        if line.startswith('WARNING'):
             self.warnings[line] += 1
 
     def to_json(self):
@@ -238,6 +241,8 @@ def add_arguments(p):
                    help='Number of tests to list in warning summary mode. Default: 10')
     p.add_argument('--platform', action='store', default='linux64',
                    help='Platform to get logs for. Default: linux64')
+    p.add_argument('--reverse', action='store_true', default=False,
+                   help='Print the least common warnings instead.')
 
 
 def main():
@@ -288,7 +293,12 @@ def main():
     if not cmdline.warning:
         print "Top %d Warnings" % cmdline.warning_count
         print "==============="
-        for (warning, count) in combined_warnings.most_common(cmdline.warning_count):
+        if cmdline.reverse:
+            warnings_list = combined_warnings.most_common()[:-cmdline.warning_count:-1]
+        else:
+            warnings_list = combined_warnings.most_common(cmdline.warning_count)
+
+        for (warning, count) in warnings_list:
             print "%6d %s" % (count, warning)
 
         print "TOTAL WARNINGS: %d" % sum(combined_warnings.values())

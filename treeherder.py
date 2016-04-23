@@ -227,7 +227,7 @@ def add_arguments(p):
     p.add_argument('revision',
                    help='Revision to retrieve logs for.')
     p.add_argument('warning', nargs='?',
-                   help='The text of a warning you want the full details of.')
+                   help='Optional: The text of a warning you want the full details of.')
     p.add_argument('--no-cache', action='store_false', default=True, dest='use_cache',
                    help='Redownload logs if already present.')
     p.add_argument('--cache-dir', action='store', default=None,

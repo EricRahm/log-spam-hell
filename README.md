@@ -13,3 +13,31 @@ High level usage:
 By default `mozilla-central` is used and the platform is `linux64`.
 
 Other repos such as `mozilla-inbound` or `try` can be substituted using the `--repo` param. Other platforms such as `windowsxp` can be specified as well using the `--platform` param.
+
+```
+usage: treeherder.py [-h] [--repo REPO] [--no-cache] [--cache-dir CACHE_DIR]
+                     [--warning-count WARNING_COUNT]
+                     [--test-summary-count TEST_SUMMARY_COUNT]
+                     [--platform PLATFORM]
+                     revision [warning]
+
+positional arguments:
+  revision              Revision to retrieve logs for.
+  warning               Optional: The text of a warning you want the full
+                        details of.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --repo REPO           Repository the revision corresponds to. Default:
+                        mozilla-central
+  --no-cache            Redownload logs if already present.
+  --cache-dir CACHE_DIR
+                        Directory to cache logs to. Default: <repo>-<revision>
+  --warning-count WARNING_COUNT
+                        Number of warnings to show in the default summary.
+                        Default: 40
+  --test-summary-count TEST_SUMMARY_COUNT
+                        Number of tests to list in warning summary mode.
+                        Default: 10
+  --platform PLATFORM   Platform to get logs for. Default: linux64
+```

@@ -19,6 +19,12 @@ from thclient import TreeherderClient
 
 DEBUG_OPTIONHASH = '32faaecac742100f7753f0c1d0aa0add01b4046b'
 
+BRANCH_MAP = {
+    'b2g-inbound': 'integration/b2g-inbound',
+    'fx-team': 'integration/fx-team',
+    'mozilla-inbound': 'integration/mozilla-inbound'
+}
+
 def normalize_line(line):
     """
     Normalizes the given line to make comparisons easier. Removes:
@@ -116,7 +122,7 @@ class WarningInfo:
             print "> %6d - %s" % (count, test)
         print ""
         print "[1] https://hg.mozilla.org/%s/annotate/%s/%s#l%d" % (
-                repo, revision, self.file, int(self.line))
+                BRANCH_MAP.get(repo, repo), revision, self.file, int(self.line))
 
 
 class ParsedLog:

@@ -6,6 +6,7 @@
 
 from argparse import ArgumentParser
 from collections import Counter
+import ConfigParser
 from functools import partial
 import json
 from multiprocessing import Pool
@@ -24,6 +25,9 @@ BRANCH_MAP = {
     'fx-team': 'integration/fx-team',
     'mozilla-inbound': 'integration/mozilla-inbound'
 }
+
+#BUGZILLA_API='https://landfill.bugzilla.org/bugzilla-5.0-branch/rest'
+BUGZILLA_API='https://bugzilla.mozilla.org/rest'
 
 def normalize_line(line):
     """
@@ -45,6 +49,54 @@ def normalize_line(line):
     line = line.strip()
 
     return line
+
+
+class Bugzilla:
+    """
+    Super basic wrapper for the bugzilla api.
+    """
+    def __init__(self, host, api_key):
+        self.host = host
+        self.api_key = api_key
+
+    def post(self, endpoint, data):
+        headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        r = requests.post("%s/%s?api_key=%s" % (self.host, endpoint, self.api_key),
+                          json=data, headers=headers)
+        #print r.headers
+        #print r.text
+        return r.json()
+
+    def create_bug(self, summary, desc, component, product='Core', version='Trunk'):
+        """
+        Files a bug for the given warning.
+        """
+
+        # Future enhancements:
+        # - Attempt to map a file to a component. There's some sort of mach
+        #   support for this. See |mach file-info|.
+        # - If warning was added recently ni? the person who added it, cc the
+        #   reviewer.
+        # - If warning was added long ago cc the person who added it.
+        # - Generate a removal patch.
+
+        r = self.post('bug', {
+            'product': product,
+            'component': component,
+            'version': version,
+            'summary': summary,
+            'description': desc,
+            'op_sys': 'All',
+            'platform': 'All',
+            'blocks': 'logspam'
+        })
+
+        return r
+
 
 class WarningInfo:
     """
@@ -100,29 +152,38 @@ class WarningInfo:
             elif not self.tests:
                 print "No warnings matched?"
 
-    def print_details(self, repo, revision, platform='linux64', test_count=10):
-        rounded = int(round(self.count) / 100) * 100
-        print "%s instances of \"%s\" emitted from %s " \
-              "during %s debug testing" % (
+    def details(self, repo, revision, platform='linux64', test_count=10):
+        """
+        Provides details for the warning suitable for filing in bugzilla.
+
+        Returns a tuple of the summary for a bug and the details for comment #0
+        of the bug.
+        """
+        rounded = int(round(self.count / 100.0)) * 100
+        summary = "%s instances of \"%s\" emitted from %s " \
+                  "during %s debug testing" % (
                       '{:,}'.format(rounded),
                       self.text,
                       self.file,
                       platform)
-        print ""
-        print "> %d %s" % (self.count, self.full_text)
-        print ""
-        print "This warning [1] shows up in the following test suites:"
-        print ""
+
+        details = []
+        details.append("> %d %s" % (self.count, self.full_text))
+        details.append("")
+        details.append("This warning [1] shows up in the following test suites:")
+        details.append("")
         for (job, count) in self.jobs.most_common():
-            print "> %6d - %s" % (count, job)
-        print ""
-        print "It shows up in %d tests. A few of the most prevalent:" % len(self.tests)
-        print ""
+            details.append("> %6d - %s" % (count, job))
+        details.append("")
+        details.append("It shows up in %d tests. A few of the most prevalent:" % len(self.tests))
+        details.append("")
         for (test, count) in self.tests.most_common(test_count):
-            print "> %6d - %s" % (count, test)
-        print ""
-        print "[1] https://hg.mozilla.org/%s/annotate/%s/%s#l%d" % (
-                BRANCH_MAP.get(repo, repo), revision, self.file, int(self.line))
+            details.append("> %6d - %s" % (count, test))
+        details.append("")
+        details.append("[1] https://hg.mozilla.org/%s/annotate/%s/%s#l%d" % (
+                BRANCH_MAP.get(repo, repo), revision, self.file, int(self.line)))
+
+        return (summary, "\n".join(details))
 
 
 class ParsedLog:
@@ -187,7 +248,13 @@ def download_log(job, dest, repo, revision):
     client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
     job_log = client.get_job_log_url(repo, job_id=job_id)
 
-    parsed_log = ParsedLog(url=job_log[0]['url'], job_name=job_name)
+    try:
+        job_log_url = job_log[0]['url']
+    except:
+        print "Couldn't determine job log URL for %s" % job_name
+        return None
+
+    parsed_log = ParsedLog(url=job_log_url, job_name=job_name)
     parsed_log.download(dest)
     return parsed_log
 
@@ -249,6 +316,14 @@ def add_arguments(p):
                    help='Platform to get logs for. Default: linux64')
     p.add_argument('--reverse', action='store_true', default=False,
                    help='Print the least common warnings instead.')
+    p.add_argument('--create-bug', action='store_true', default=False,
+                   help='Create a new bug for the specified warning.')
+    p.add_argument('--component', action='store', default=None,
+                   help='Component to file the bug in.')
+    p.add_argument('--product', action='store', default='Core',
+                   help='Product to file the bug in. Default: Core')
+    p.add_argument('--api-key', action='store', default=None,
+                   help='The API key to use when creating the bug. Default: extracted from .hgrc')
 
 
 def main():
@@ -294,7 +369,8 @@ def main():
 
     combined_warnings = Counter()
     for log in files:
-        combined_warnings.update(log.warnings)
+        if log:
+            combined_warnings.update(log.warnings)
 
     if not cmdline.warning:
         print "Top %d Warnings" % cmdline.warning_count
@@ -309,9 +385,35 @@ def main():
 
         print "TOTAL WARNINGS: %d" % sum(combined_warnings.values())
     else:
-        details = WarningInfo(cmdline.warning, combined_warnings[cmdline.warning])
-        details.match_in_logs(cache_dir, files)
-        details.print_details(cmdline.repo, cmdline.revision, cmdline.platform, cmdline.test_summary_count)
+        info = WarningInfo(cmdline.warning, combined_warnings[cmdline.warning])
+        info.match_in_logs(cache_dir, files)
+        (summary, details) = info.details(
+                cmdline.repo, cmdline.revision,
+                cmdline.platform, cmdline.test_summary_count)
+
+        if cmdline.create_bug:
+            if not cmdline.component:
+                print "Must specify component."
+                return
+
+            api_key = cmdline.api_key
+            if not api_key:
+                try:
+                    cfg = ConfigParser.ConfigParser()
+                    cfg.read(os.path.join(os.path.expanduser('~'), '.hgrc'))
+                    api_key = cfg.get('bugzilla', 'apikey')
+                except:
+                    print "I'm sorry, I couldn't guess your api key. Please " \
+                          "specify it with --api_key"
+                    return
+
+            bz = Bugzilla(BUGZILLA_API, api_key)
+            result = bz.create_bug(
+                    summary, details, component=cmdline.component,
+                    product=cmdline.product)
+            print "Filed bug %d" % result['id']
+        else:
+            print "\n".join([summary, "", details])
 
 
 if __name__ == '__main__':

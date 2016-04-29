@@ -108,7 +108,12 @@ class WarningInfo:
 
         # Extract the warning text, file name, and line number.
         m = re.match(r'.*WARNING: (.*)[:,] file ([^,]+), line ([0-9]+).*', warning_text)
-        (self.text, self.file, self.line) = m.group(1, 2, 3)
+        if m:
+            (self.text, self.file, self.line) = m.group(1, 2, 3)
+        else:
+            self.text = warning_text
+            self.file = "none"
+            self.line = 0
 
         self.jobs = Counter()
         self.tests = Counter()
@@ -200,7 +205,7 @@ class ParsedLog:
 
         self.warnings = Counter()
 
-    def download(self, cache_dir):
+    def download(self, cache_dir, warning_re):
         """
         Downloads the log file and normalizes it. Warnings are also
         accumulated.
@@ -210,14 +215,14 @@ class ParsedLog:
             for x in r.iter_lines():
                 if x:
                     line = normalize_line(x)
-                    self.add_warning(line)
+                    self.add_warning(line, warning_re)
                     f.write(line + '\n')
 
-    def add_warning(self, line):
+    def add_warning(self, line, match_re=r'^WARNING'):
         """
         Adds the line to the set of warnings if it contains a warning.
         """
-        if line.startswith('WARNING'):
+        if re.search(match_re, line):
             self.warnings[line] += 1
 
     def to_json(self):
@@ -232,7 +237,7 @@ class ParsedLog:
         }
 
 
-def download_log(job, dest, repo, revision):
+def download_log(job, dest, repo, revision, warning_re):
     """
     Downloads the log file for the given job.
 
@@ -255,7 +260,7 @@ def download_log(job, dest, repo, revision):
         return None
 
     parsed_log = ParsedLog(url=job_log_url, job_name=job_name)
-    parsed_log.download(dest)
+    parsed_log.download(dest, warning_re)
     return parsed_log
 
 
@@ -324,6 +329,9 @@ def add_arguments(p):
                    help='Product to file the bug in. Default: Core')
     p.add_argument('--api-key', action='store', default=None,
                    help='The API key to use when creating the bug. Default: extracted from .hgrc')
+    p.add_argument('--warning-re', action='store', default=r'^WARNING',
+                   help='Regex used to match lines. Can be used to match ' \
+                        'debug messages that are not proper warnings.')
 
 
 def main():
@@ -343,6 +351,9 @@ def main():
     else:
         client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
         result_set = client.get_resultsets(cmdline.repo, revision=cmdline.revision)
+        if not result_set:
+            print "Failed to find %s in %s" % (cmdline.revision, cmdline.repo)
+            return
 
         # We just want linux64 debug builds:
         #   - platform='linux64'
@@ -359,7 +370,8 @@ def main():
 
         # Bind fixed arguments to the |download_log| call.
         partial_download_log = partial(download_log, dest=cache_dir,
-                                      repo=cmdline.repo, revision=cmdline.revision)
+                                      repo=cmdline.repo, revision=cmdline.revision,
+                                      warning_re=cmdline.warning_re)
 
         pool = Pool(processes=12)
         files = pool.map(partial_download_log, jobs)

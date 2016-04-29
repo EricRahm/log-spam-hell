@@ -18,7 +18,9 @@ Other repos such as `mozilla-inbound` or `try` can be substituted using the `--r
 usage: treeherder.py [-h] [--repo REPO] [--no-cache] [--cache-dir CACHE_DIR]
                      [--warning-count WARNING_COUNT]
                      [--test-summary-count TEST_SUMMARY_COUNT]
-                     [--platform PLATFORM]
+                     [--platform PLATFORM] [--reverse] [--create-bug]
+                     [--component COMPONENT] [--product PRODUCT]
+                     [--api-key API_KEY] [--warning-re WARNING_RE]
                      revision [warning]
 
 positional arguments:
@@ -40,4 +42,14 @@ optional arguments:
                         Number of tests to list in warning summary mode.
                         Default: 10
   --platform PLATFORM   Platform to get logs for. Default: linux64
+  --reverse             Print the least common warnings instead.
+  --create-bug          Create a new bug for the specified warning.
+  --component COMPONENT
+                        Component to file the bug in.
+  --product PRODUCT     Product to file the bug in. Default: Core
+  --api-key API_KEY     The API key to use when creating the bug. Default:
+                        extracted from .hgrc
+  --warning-re WARNING_RE
+                        Regex used to match lines. Can be used to match debug
+                        messages that are not proper warnings.
 ```

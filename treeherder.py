@@ -14,9 +14,14 @@ import os
 import pprint
 import re
 import shutil
+import datetime
 
 import requests
 from thclient import TreeherderClient
+
+from mozregression.bisector import (Bisector, Bisection, NightlyHandler, InboundHandler)
+from mozregression.test_runner import TestRunner
+
 
 DEBUG_OPTIONHASH = '32faaecac742100f7753f0c1d0aa0add01b4046b'
 
@@ -332,36 +337,73 @@ def add_arguments(p):
     p.add_argument('--warning-re', action='store', default=r'^WARNING',
                    help='Regex used to match lines. Can be used to match ' \
                         'debug messages that are not proper warnings.')
+    p.add_argument('--bisect', action='store', default=None,
+                   help='Date to bisect from.')
 
 
-def main():
-    parser = ArgumentParser()
-    add_arguments(parser)
-    cmdline = parser.parse_args()
+class WarningTestRunner(TestRunner):
+    """
+    TestRunner to use in conjunction with bisection.
+    """
+    def __init__(self, warning, platform='linux64'):
+        TestRunner.__init__(self)
+        self.warning = warning
+        self.platform = platform
 
-    cache_dir = cmdline.cache_dir
+    def evaluate(self, build_info, allow_back=False):
+        files = retrieve_test_logs(
+                build_info.repo_name, build_info.changeset[:12], self.platform)
+
+        combined_warnings = Counter()
+        for log in files:
+            if log:
+                combined_warnings.update(log.warnings)
+
+        # TODO(ER): Replace arbitrary threshold.
+        if combined_warnings[self.warning] > 200:
+            return 'b'
+        else:
+            return 'g'
+
+    def run_once(self, build_info):
+        return 0 if self.evaluate(build_info) == 'g' else 1
+
+
+def retrieve_test_logs(repo, revision, platform='linux64',
+                       cache_dir=None, use_cache=True,
+                       warning_re=r'^WARNING'):
+    """
+    Retrieves and processe the test logs for the given revision.
+
+    Returns list of processed files.
+    """
     if not cache_dir:
-        cache_dir = "%s-%s" % (cmdline.repo, cmdline.revision)
+        cache_dir = "%s-%s" % (repo, revision)
 
+    files = None
     cache_dir_exists = os.path.isdir(cache_dir)
-    if cache_dir_exists and cmdline.use_cache:
+    if cache_dir_exists and use_cache:
         # We already have logs for this revision.
         print "Using cached data"
-        files = read_cached_results(cache_dir)
-    else:
+        try:
+            files = read_cached_results(cache_dir)
+        except:
+            print "Cache is hosed"
+
+    if not files:
         client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
-        result_set = client.get_resultsets(cmdline.repo, revision=cmdline.revision)
+        result_set = client.get_resultsets(repo, revision=revision)
         if not result_set:
-            print "Failed to find %s in %s" % (cmdline.revision, cmdline.repo)
-            return
+            print "Failed to find %s in %s" % (revision, repo)
+            return None
 
         # We just want linux64 debug builds:
         #   - platform='linux64'
         #   - Crazytown param for debug: option_collection_hash
-        jobs = client.get_jobs(cmdline.repo,
+        jobs = client.get_jobs(repo,
                                result_set_id=result_set[0]['id'],
                                count=5000, # Just make this really large to avoid pagination
-                               platform=cmdline.platform,
+                               platform=platform,
                                option_collection_hash=DEBUG_OPTIONHASH)
 
         if cache_dir_exists:
@@ -370,14 +412,78 @@ def main():
 
         # Bind fixed arguments to the |download_log| call.
         partial_download_log = partial(download_log, dest=cache_dir,
-                                      repo=cmdline.repo, revision=cmdline.revision,
-                                      warning_re=cmdline.warning_re)
+                                      repo=repo, revision=revision,
+                                      warning_re=warning_re)
 
         pool = Pool(processes=12)
         files = pool.map(partial_download_log, jobs)
         pool.close()
 
         cache_results(cache_dir, files)
+
+    return files
+
+
+def main():
+    parser = ArgumentParser()
+    add_arguments(parser)
+    cmdline = parser.parse_args()
+
+    if cmdline.bisect:
+        from mozregression.fetch_configs import create_config
+        from mozregression.dates import parse_date
+        from mozregression.log import init_logger
+        init_logger(debug=True)
+
+        (os, bits) = re.match(r'([a-zA-Z]+)([0-9]+)', cmdline.platform).groups()
+        first_date = parse_date(cmdline.bisect)
+        last_date = datetime.date.today()
+
+        fetch_config = create_config('firefox', os, int(bits))
+        fetch_config.set_repo(cmdline.repo)
+
+        test_runner = WarningTestRunner(cmdline.warning, cmdline.platform)
+        bisector = Bisector(
+                fetch_config,
+                test_runner,
+                None,
+                False,
+                None)
+
+        handler = NightlyHandler()
+        result = bisector.bisect(handler, first_date, last_date)
+        if result == Bisection.FINISHED:
+            print "Got as far as we can go bisecting nightlies..."
+            handler.print_range()
+            print "Switching bisection method to taskcluster"
+            fetch_config.set_repo(fetch_config.get_nightly_repo(handler.bad_date))
+
+            good_revision = handler.good_revision
+            bad_revision = handler.bad_revision
+
+            def bisect_inbound(good_rev, bad_rev):
+                handler = InboundHandler()
+                result = bisector.bisect(handler, good_rev, bad_rev, expand=0)
+                if result == Bisection.FINISHED:
+                    print "Oh noes, no (more) inbound revisions :("
+                    handler.print_range()
+                    if len(handler.build_range) == 2:
+                        result = handler.handle_merge()
+                        if result:
+                            branch, good_rev, bad_rev = result
+                            fetch_config.set_repo(branch)
+                            bisect_inbound(good_rev, bad_rev)
+
+            bisect_inbound(good_revision, bad_revision)
+
+
+        print "Done bisecting I guess"
+        return
+
+
+    files = retrieve_test_logs(cmdline.repo, cmdline.revision, cmdline.platform,
+                               cmdline.cache_dir, cmdline.use_cache,
+                               cmdline.warning_re)
 
     combined_warnings = Counter()
     for log in files:

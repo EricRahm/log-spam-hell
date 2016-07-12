@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 from collections import Counter
 import ConfigParser
 from functools import partial
+import hashlib
 import json
 from multiprocessing import Pool
 import os
@@ -20,6 +21,7 @@ import requests
 from thclient import TreeherderClient
 
 from mozregression.bisector import (Bisector, Bisection, NightlyHandler, InboundHandler)
+from mozregression.fetch_build_info import InboundInfoFetcher
 from mozregression.test_runner import TestRunner
 
 
@@ -33,6 +35,8 @@ BRANCH_MAP = {
 
 #BUGZILLA_API='https://landfill.bugzilla.org/bugzilla-5.0-branch/rest'
 BUGZILLA_API='https://bugzilla.mozilla.org/rest'
+
+WARNING_RE='^WARNING'
 
 def normalize_line(line):
     """
@@ -215,15 +219,22 @@ class ParsedLog:
         Downloads the log file and normalizes it. Warnings are also
         accumulated.
         """
-        r = requests.get(self.url, stream=True)
-        with open(os.path.join(cache_dir, self.fname), 'w') as f:
-            for x in r.iter_lines():
-                if x:
-                    line = normalize_line(x)
-                    self.add_warning(line, warning_re)
-                    f.write(line + '\n')
+        # Check if we can bypass downloading first.
+        dest = os.path.join(cache_dir, self.fname)
+        if os.path.exists(dest):
+            with open(dest, 'r') as f:
+                for x in f:
+                    self.add_warning(x.rstrip(), warning_re)
+        else:
+            r = requests.get(self.url, stream=True)
+            with open(dest, 'w') as f:
+                for x in r.iter_lines():
+                    if x:
+                        line = normalize_line(x)
+                        self.add_warning(line, warning_re)
+                        f.write(line + '\n')
 
-    def add_warning(self, line, match_re=r'^WARNING'):
+    def add_warning(self, line, match_re=WARNING_RE):
         """
         Adds the line to the set of warnings if it contains a warning.
         """
@@ -279,20 +290,32 @@ class CustomEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def cache_results(dest, parsed_logs):
+def cache_file_path(cache_dir, warning_re):
+    """
+    Generates the cache file name.
+    """
+    if warning_re != WARNING_RE:
+        warning_md5 = hashlib.md5(warning_re).hexdigest()
+        return os.path.join(cache_dir, "results.%s.json" % warning_md5)
+    else:
+        return os.path.join(cache_dir, "results.json")
+
+
+def cache_results(dest, parsed_logs, warning_re):
     """
     Caches the parsed results in a json file.
     """
-    fname = os.path.join(dest, "results.json")
+    fname = cache_file_path(dest, warning_re)
     with open(fname, 'w') as f:
         json.dump(parsed_logs, f, cls=CustomEncoder)
 
 
-def read_cached_results(cache_dir):
+def read_cached_results(cache_dir, warning_re):
     """
     Reads the cached results from a previous run.
     """
-    fname = os.path.join(cache_dir, "results.json")
+    fname = cache_file_path(cache_dir, warning_re)
+    print "Reading cache from %s" % fname
     parsed_logs = []
     with open(fname, 'r') as f:
         raw_list = json.load(f)
@@ -334,33 +357,54 @@ def add_arguments(p):
                    help='Product to file the bug in. Default: Core')
     p.add_argument('--api-key', action='store', default=None,
                    help='The API key to use when creating the bug. Default: extracted from .hgrc')
-    p.add_argument('--warning-re', action='store', default=r'^WARNING',
+    p.add_argument('--warning-re', action='store', default=WARNING_RE,
                    help='Regex used to match lines. Can be used to match ' \
                         'debug messages that are not proper warnings.')
     p.add_argument('--bisect', action='store', default=None,
                    help='Date to bisect from.')
+    p.add_argument('--ignore-lines', action='store_true', default=False,
+                   help='Ignore line numbers when bisecting warnings. Useful if' \
+                        ' the line number of the warning has changed. Not so ' \
+                        'useful if there are a lot of similar warnings in the ' \
+                        'file.')
 
 
 class WarningTestRunner(TestRunner):
     """
     TestRunner to use in conjunction with bisection.
     """
-    def __init__(self, warning, platform='linux64'):
+    def __init__(self, warning, platform='linux64', ignore_lines=False, warning_re=WARNING_RE):
         TestRunner.__init__(self)
         self.warning = warning
+        self.warning_re = warning_re
         self.platform = platform
+        self.ignore_lines = ignore_lines
 
     def evaluate(self, build_info, allow_back=False):
         files = retrieve_test_logs(
-                build_info.repo_name, build_info.changeset[:12], self.platform)
+                build_info.repo_name, build_info.changeset[:12],
+                self.platform, warning_re=self.warning_re)
 
         combined_warnings = Counter()
         for log in files:
             if log:
                 combined_warnings.update(log.warnings)
 
+        if self.ignore_lines:
+            normalized = re.match(r'^(.*), line [0-9]+$', self.warning).group(1)
+
+            total = 0
+            for (k, v) in combined_warnings.iteritems():
+                if k.startswith(normalized):
+                    total += v
+            print "%d - %s" % (total, normalized)
+        else:
+            total = combined_warnings[self.warning]
+            print "%d - %s" % (total, self.warning)
+
+
         # TODO(ER): Replace arbitrary threshold.
-        if combined_warnings[self.warning] > 200:
+        if total > 800:
             return 'b'
         else:
             return 'g'
@@ -371,14 +415,14 @@ class WarningTestRunner(TestRunner):
 
 def retrieve_test_logs(repo, revision, platform='linux64',
                        cache_dir=None, use_cache=True,
-                       warning_re=r'^WARNING'):
+                       warning_re=WARNING_RE):
     """
-    Retrieves and processe the test logs for the given revision.
+    Retrieves and processes the test logs for the given revision.
 
     Returns list of processed files.
     """
     if not cache_dir:
-        cache_dir = "%s-%s" % (repo, revision)
+        cache_dir = "%s-%s-%s" % (repo, revision, platform)
 
     files = None
     cache_dir_exists = os.path.isdir(cache_dir)
@@ -386,9 +430,9 @@ def retrieve_test_logs(repo, revision, platform='linux64',
         # We already have logs for this revision.
         print "Using cached data"
         try:
-            files = read_cached_results(cache_dir)
+            files = read_cached_results(cache_dir, warning_re)
         except:
-            print "Cache is hosed"
+            print "Cache file for %s not found" % warning_re
 
     if not files:
         client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
@@ -406,9 +450,23 @@ def retrieve_test_logs(repo, revision, platform='linux64',
                                platform=platform,
                                option_collection_hash=DEBUG_OPTIONHASH)
 
+        if not jobs:
+            print "No jobs found for %s %s" % (revision, platform)
+            return None
+
+        #platforms = set()
+        #for job in jobs:
+        #    platforms.add(job['build_platform'])
+        #pprint.pprint(platforms)
+        #pprint.pprint(jobs[0])
+        #return None
+
         if cache_dir_exists:
-            shutil.rmtree(cache_dir)
-        os.mkdir(cache_dir)
+            if not use_cache:
+                shutil.rmtree(cache_dir)
+                os.mkdir(cache_dir)
+        else:
+            os.mkdir(cache_dir)
 
         # Bind fixed arguments to the |download_log| call.
         partial_download_log = partial(download_log, dest=cache_dir,
@@ -419,7 +477,7 @@ def retrieve_test_logs(repo, revision, platform='linux64',
         files = pool.map(partial_download_log, jobs)
         pool.close()
 
-        cache_results(cache_dir, files)
+        cache_results(cache_dir, files, warning_re)
 
     return files
 
@@ -435,14 +493,30 @@ def main():
         from mozregression.log import init_logger
         init_logger(debug=True)
 
-        (os, bits) = re.match(r'([a-zA-Z]+)([0-9]+)', cmdline.platform).groups()
+        (_os, bits) = re.match(r'([a-zA-Z]+)-?([0-9]+)?', cmdline.platform).groups()
+        if not bits:
+            bits = 32
+
+        if _os.startswith('win'):
+            _os = 'win'
+
         first_date = parse_date(cmdline.bisect)
-        last_date = datetime.date.today()
+        #last_date = datetime.date.today()
+        last_date = parse_date(cmdline.revision)
 
-        fetch_config = create_config('firefox', os, int(bits))
+        fetch_config = create_config('firefox', _os, int(bits))
         fetch_config.set_repo(cmdline.repo)
+        fetch_config.set_build_type('debug')
 
-        test_runner = WarningTestRunner(cmdline.warning, cmdline.platform)
+	#info_fetcher = InboundInfoFetcher(fetch_config)
+	#build_info = info_fetcher.find_build_info(cmdline.revision)
+	#last_date = build_info.build_date
+
+        test_runner = WarningTestRunner(
+                cmdline.warning, cmdline.platform,
+                ignore_lines=cmdline.ignore_lines,
+                warning_re=cmdline.warning_re)
+
         bisector = Bisector(
                 fetch_config,
                 test_runner,
@@ -450,7 +524,7 @@ def main():
                 False,
                 None)
 
-        handler = NightlyHandler()
+        handler = NightlyHandler(ensure_good_and_bad=True)
         result = bisector.bisect(handler, first_date, last_date)
         if result == Bisection.FINISHED:
             print "Got as far as we can go bisecting nightlies..."
@@ -503,6 +577,10 @@ def main():
 
         print "TOTAL WARNINGS: %d" % sum(combined_warnings.values())
     else:
+        cache_dir = cmdline.cache_dir
+        if not cache_dir:
+            cache_dir = "%s-%s-%s" % (cmdline.repo, cmdline.revision, cmdline.platform)
+
         info = WarningInfo(cmdline.warning, combined_warnings[cmdline.warning])
         info.match_in_logs(cache_dir, files)
         (summary, details) = info.details(
@@ -520,9 +598,10 @@ def main():
                     cfg = ConfigParser.ConfigParser()
                     cfg.read(os.path.join(os.path.expanduser('~'), '.hgrc'))
                     api_key = cfg.get('bugzilla', 'apikey')
-                except:
+                except Exception, e:
                     print "I'm sorry, I couldn't guess your api key. Please " \
                           "specify it with --api_key"
+                    print e
                     return
 
             bz = Bugzilla(BUGZILLA_API, api_key)

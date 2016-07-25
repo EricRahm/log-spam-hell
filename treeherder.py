@@ -208,7 +208,7 @@ class ParsedLog:
         self.url = url
         self.job_name = job_name
         if not file_name:
-            self.fname = job_name.replace(' ', '_') + '.log'
+            self.fname = os.path.basename(job_name.replace(' ', '_') + '.log')
         else:
             self.fname = file_name
 

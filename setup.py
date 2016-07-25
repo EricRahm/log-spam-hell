@@ -18,6 +18,7 @@ setup(
     ],
     #packages=["atsy"],
     install_requires=[
+      "mozregression",
       "requests",
       "treeherder-client",
     ],

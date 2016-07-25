@@ -214,11 +214,21 @@ class ParsedLog:
 
         self.warnings = Counter()
 
+    def _download_file(self, dest, warning_re):
+        r = requests.get(self.url, stream=True)
+        with open(dest, 'w') as f:
+            for x in r.iter_lines():
+                if x:
+                    line = normalize_line(x)
+                    self.add_warning(line, warning_re)
+                    f.write(line + '\n')
+
     def download(self, cache_dir, warning_re):
         """
         Downloads the log file and normalizes it. Warnings are also
         accumulated.
         """
+        success = True
         # Check if we can bypass downloading first.
         dest = os.path.join(cache_dir, self.fname)
         if os.path.exists(dest):
@@ -226,13 +236,18 @@ class ParsedLog:
                 for x in f:
                     self.add_warning(x.rstrip(), warning_re)
         else:
-            r = requests.get(self.url, stream=True)
-            with open(dest, 'w') as f:
-                for x in r.iter_lines():
-                    if x:
-                        line = normalize_line(x)
-                        self.add_warning(line, warning_re)
-                        f.write(line + '\n')
+            success = False
+            for i in range(5):
+                try:
+                    self._download_file(dest, warning_re)
+                    success = True
+                    break
+                except requests.exceptions.ConnectionError:
+                    # TODO(ER): Maybe nuke dest?
+                    self.warnings.clear()
+                    pass
+
+        return success
 
     def add_warning(self, line, match_re=WARNING_RE):
         """
@@ -276,7 +291,10 @@ def download_log(job, dest, repo, revision, warning_re):
         return None
 
     parsed_log = ParsedLog(url=job_log_url, job_name=job_name)
-    parsed_log.download(dest, warning_re)
+    if not parsed_log.download(dest, warning_re):
+        print "Couldn't download log URL for %s" % job_name
+        return None
+
     return parsed_log
 
 
@@ -404,7 +422,7 @@ class WarningTestRunner(TestRunner):
 
 
         # TODO(ER): Replace arbitrary threshold.
-        if total > 800:
+        if total > 500:
             return 'b'
         else:
             return 'g'

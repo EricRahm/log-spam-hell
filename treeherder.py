@@ -606,6 +606,11 @@ def main():
 
         print "TOTAL WARNINGS: %d" % sum(combined_warnings.values())
     else:
+        # Sanity check the warning format.
+        if not re.match(cmdline.warning_re, cmdline.warning):
+            print "Provided warning %s does not match warning regex %s" % (cmdline.warning, cmdline.warning_re)
+            return
+
         cache_dir = cmdline.cache_dir
         if not cache_dir:
             cache_dir = "%s-%s-%s" % (cmdline.repo, cmdline.revision, cmdline.platform)
@@ -619,6 +624,11 @@ def main():
         if cmdline.create_bug:
             if not cmdline.component:
                 print "Must specify component."
+                return
+
+            if not info.count:
+                print "There are zero warnings matching %s" % cmdline.warning
+                print "Not filing bug!"
                 return
 
             api_key = cmdline.api_key

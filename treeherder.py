@@ -403,6 +403,13 @@ class WarningTestRunner(TestRunner):
                 build_info.repo_name, build_info.changeset[:12],
                 self.platform, warning_re=self.warning_re)
 
+        # Somewhat arbitrary, but we need to make sure there are enough tests
+        # run in order to make a reasonable evaluation of the amount of
+        # warnings present.
+        if len(files) < 10:
+            # Tell the bisector to skip this build.
+            return 's'
+
         combined_warnings = Counter()
         for log in files:
             if log:
@@ -462,11 +469,15 @@ def retrieve_test_logs(repo, revision, platform='linux64',
         # We just want linux64 debug builds:
         #   - platform='linux64'
         #   - Crazytown param for debug: option_collection_hash
-        jobs = client.get_jobs(repo,
-                               result_set_id=result_set[0]['id'],
-                               count=5000, # Just make this really large to avoid pagination
-                               platform=platform,
-                               option_collection_hash=DEBUG_OPTIONHASH)
+        for x in range(5):
+            try:
+                jobs = client.get_jobs(repo,
+                                       result_set_id=result_set[0]['id'],
+                                       count=5000, # Just make this really large to avoid pagination
+                                       platform=platform,
+                                       option_collection_hash=DEBUG_OPTIONHASH)
+            except requests.exceptions.ConnectionError:
+                pass
 
         if not jobs:
             print "No jobs found for %s %s" % (revision, platform)
@@ -518,8 +529,8 @@ def main():
         if _os.startswith('win'):
             _os = 'win'
 
+        # TODO(ER): Support revisions as well as dates.
         first_date = parse_date(cmdline.bisect)
-        #last_date = datetime.date.today()
         last_date = parse_date(cmdline.revision)
 
         fetch_config = create_config('firefox', _os, int(bits))

@@ -46,6 +46,9 @@ def normalize_line(line):
       - trims file paths
       - stuff that looks like a pointer address
     """
+    # taskcluster prefixing:
+    #   [task 2016-09-20T11:09:35.539828Z] 11:09:35
+    line = re.sub(r'^\[task[^\]]+\]\s', '', line)
     line = re.sub(r'^[0-9:]+\s+INFO\s+-\s+', '', line)
     line = re.sub(r'^PROCESS \| [0-9]+ \| ', '', line)
     line = re.sub(r'\[(Child|Parent|GMP|NPAPI)?\s?[0-9]+\]', '', line)

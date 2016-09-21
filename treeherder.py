@@ -505,7 +505,7 @@ def retrieve_test_logs(repo, revision, platform='linux64',
                                       repo=repo, revision=revision,
                                       warning_re=warning_re)
 
-        pool = Pool(processes=12)
+        pool = Pool(processes=24)
         files = pool.map(partial_download_log, jobs)
         pool.close()
 

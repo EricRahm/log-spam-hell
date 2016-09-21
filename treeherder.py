@@ -432,7 +432,7 @@ class WarningTestRunner(TestRunner):
 
 
         # TODO(ER): Replace arbitrary threshold.
-        if total > 500:
+        if total > 1000:
             return 'b'
         else:
             return 'g'

@@ -284,11 +284,8 @@ def download_log(job, dest, repo, revision, warning_re):
 
     print "Downloading log for %s %d" % (job_name, job_id)
 
-    client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
-    job_log = client.get_job_log_url(repo, job_id=job_id)
-
     try:
-        job_log_url = job_log[0]['url']
+        job_log_url = job['url']
     except:
         print "Couldn't determine job log URL for %s" % job_name
         return None
@@ -479,12 +476,24 @@ def retrieve_test_logs(repo, revision, platform='linux64',
                                        count=5000, # Just make this really large to avoid pagination
                                        platform=platform,
                                        option_collection_hash=DEBUG_OPTIONHASH)
+                break
             except requests.exceptions.ConnectionError:
                 pass
 
         if not jobs:
             print "No jobs found for %s %s" % (revision, platform)
             return None
+
+        # For now we need to determine the log urls one at a time to avoid
+        # angering the treeherder gods.
+        for job in jobs:
+            for x in range(5):
+                try:
+                    job_log = client.get_job_log_url(repo, job_id=job['id'])
+                    job['url'] = job_log[0]['url']
+                    break
+                except requests.exceptions.ConnectionError:
+                    pass
 
         #platforms = set()
         #for job in jobs:

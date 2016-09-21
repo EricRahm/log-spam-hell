@@ -406,8 +406,9 @@ class WarningTestRunner(TestRunner):
         # Somewhat arbitrary, but we need to make sure there are enough tests
         # run in order to make a reasonable evaluation of the amount of
         # warnings present.
-        if len(files) < 10:
+        if len(files) < 100:
             # Tell the bisector to skip this build.
+            print "Skipping build %s, not enough tests run" % build_info.changeset[:12]
             return 's'
 
         combined_warnings = Counter()

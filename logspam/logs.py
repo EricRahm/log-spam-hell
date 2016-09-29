@@ -164,7 +164,7 @@ def retrieve_test_logs(repo, revision, platform='linux64',
         print "Using cached data"
         try:
             return cache.read_results()
-        except CacheFileNotFoundException as e:
+        except logspam.cache.CacheFileNotFoundException as e:
             print "Cache file for %s not found" % warning_re
             print e
 

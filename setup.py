@@ -24,6 +24,6 @@ setup(
       "treeherder-client",
     ],
     entry_points={
-      'console_scripts': ['log_spam=treeherder:main']
+      'console_scripts': ['log_spam=logspam.cli_entry:main']
     }
 )

@@ -12,7 +12,6 @@ setup(
     url="https://github.com/EricRahm/log-spam-hell",
     author="Eric Rahm",
     author_email="erahm@mozilla.com",
-    url="https://github.com/EricRahm/log-spam-hell",
     download_url="https://github.com/EricRahm/log-spam-hell/tarball/0.1",
     license="MPL 2.0",
     classifiers=[

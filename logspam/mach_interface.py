@@ -26,10 +26,8 @@ def new_release_on_pypi():
 
     None is returned in case of error or if there is no new version.
     """
-    return None
     try:
-        #url = "https://pypi.python.org/pypi/logspam/json"
-        url = "https://testpypi.python.org/pypi/mozilla-log-spam/json"
+        url = "https://pypi.python.org/pypi/mozilla-log-spam/json"
         pypi_version = requests.get(url, timeout=10).json()['info']['version']
     except Exception:
         return

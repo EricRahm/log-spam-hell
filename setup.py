@@ -22,7 +22,7 @@ setup(
     install_requires=[
       "mozregression",
       "requests",
-      "treeherder-client",
+      "treeherder-client>=3.0",
     ],
     entry_points={
       'console_scripts': ['log_spam=logspam.cli_entry:main']

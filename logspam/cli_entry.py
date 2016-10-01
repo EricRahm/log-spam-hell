@@ -4,6 +4,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+"""
+Script used as a CLI entry point.
+"""
+
 from argparse import ArgumentParser
 
 from logspam.bisect import BisectCommandLineArgs
@@ -14,12 +18,12 @@ def add_arguments(p):
     """
     Adds command-line arguments to the given argparser.
     """
-    # TODO(ER): Figure out better text.
-    subparsers = p.add_subparsers(title='subcommands',
-                                  description='valid subcommands',
-                                  help='additional help')
+    subparsers = p.add_subparsers(
+            title='subcommands',
+            description='Commands supported by the logspam tool')
 
-    for command in (ReportCommandLineArgs, FileCommandLineArgs, BisectCommandLineArgs):
+    for command in (ReportCommandLineArgs, FileCommandLineArgs,
+                    BisectCommandLineArgs):
         args = command()
         args.add_command(subparsers)
 

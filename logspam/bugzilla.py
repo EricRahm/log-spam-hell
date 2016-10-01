@@ -94,7 +94,8 @@ class FileCommandLineArgs(ReportCommandLineArgs):
         print "Filed bug %d" % result['id']
 
     def add_command(self, p):
-       parser = p.add_parser('file')
+       parser = p.add_parser('file',
+            help='Files a logspam bug in bugzilla for the given warning.')
        self.add_arguments(parser)
        parser.set_defaults(func=FileCommandLineArgs.do_file)
 

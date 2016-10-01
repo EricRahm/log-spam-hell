@@ -81,7 +81,9 @@ class ReportCommandLineArgs(BaseCommandLineArgs):
             print "\n".join([summary, "", details])
 
     def add_command(self, p):
-       parser = p.add_parser('report')
+       parser = p.add_parser('report',
+            help='Generates an overall warning report or a report for a '
+                 'specific warning.')
        self.add_arguments(parser)
        parser.set_defaults(func=ReportCommandLineArgs.do_report)
 

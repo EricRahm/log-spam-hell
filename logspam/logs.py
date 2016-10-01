@@ -5,6 +5,7 @@
 from collections import Counter
 from functools import partial
 
+from logspam import WARNING_RE
 import logspam.cache
 
 from multiprocessing import Pool
@@ -24,8 +25,6 @@ BRANCH_MAP = {
 
 # Magic number for retrieving debug build info from Treeherder
 DEBUG_OPTIONHASH = '32faaecac742100f7753f0c1d0aa0add01b4046b'
-
-WARNING_RE='^WARNING'
 
 class WarningInfo:
     """

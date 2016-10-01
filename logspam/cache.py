@@ -8,9 +8,8 @@ import json
 import os
 import re
 import requests
-#from logspam.logs import ParsedLog
 
-WARNING_RE='^WARNING'
+from logspam import WARNING_RE
 
 class CacheFileNotFoundException(Exception):
     pass

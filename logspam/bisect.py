@@ -4,6 +4,7 @@
 
 from collections import Counter
 
+from logspam import WARNING_RE
 from logspam.cli import BaseCommandLineArgs
 from logspam.logs import retrieve_test_logs
 
@@ -19,7 +20,6 @@ from mozregression.test_runner import TestRunner
 
 import re
 
-WARNING_RE='^WARNING'
 
 class WarningBisector(object):
     def __init__(self, good, bad, platform, warning,
@@ -125,7 +125,9 @@ class BisectCommandLineArgs(BaseCommandLineArgs):
 
 
     def add_command(self, p):
-       parser = p.add_parser('bisect')
+       parser = p.add_parser('bisect',
+            help='Attempts to find the changeset that introduced a given '
+                 'warning through bisection.')
        self.add_arguments(parser)
        parser.set_defaults(func=BisectCommandLineArgs.do_bisect)
 

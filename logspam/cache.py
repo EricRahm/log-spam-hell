@@ -4,6 +4,7 @@
 
 from collections import Counter
 import hashlib
+import io
 import json
 import os
 import re
@@ -26,6 +27,7 @@ def normalize_line(line):
     #   [task 2016-09-20T11:09:35.539828Z] 11:09:35
     line = re.sub(r'^\[task[^\]]+\]\s', '', line)
     line = re.sub(r'^[0-9:]+\s+INFO\s+-\s+', '', line)
+    line = re.sub(r'^[0-9]+\s+INFO\s+', '', line)
     line = re.sub(r'^PROCESS \| [0-9]+ \| ', '', line)
     line = re.sub(r'\[(Child|Parent|GMP|NPAPI)?\s?[0-9]+\]', '', line)
     line = re.sub(r'/home/worker/workspace/build/src/', '', line)
@@ -79,7 +81,8 @@ class ParsedLog:
         # Check if we can bypass downloading first.
         dest = os.path.join(cache_dir, self.fname)
         if os.path.exists(dest):
-            with open(dest, 'r') as f:
+            # Use |io.open| to handle unicode weirdness
+            with io.open(dest, 'r', encoding='utf-8') as f:
                 for x in f:
                     self.add_warning(x.rstrip(), warning_re)
         else:

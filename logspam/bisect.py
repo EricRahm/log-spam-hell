@@ -23,7 +23,8 @@ import re
 
 class WarningBisector(object):
     def __init__(self, good, bad, platform, warning,
-                 warning_limit, warning_re, ignore_lines):
+                 warning_limit, warning_re, ignore_lines,
+                 required_test):
 
         init_logger()
         self.use_nightly = True
@@ -44,7 +45,8 @@ class WarningBisector(object):
                 warning, platform,
                 ignore_lines=ignore_lines,
                 warning_re=warning_re,
-                warning_limit=warning_limit)
+                warning_limit=warning_limit,
+                required_test=required_test)
 
         # Convert the platform to a mozregression friendly version.
         # Also avoid overwriting the os module by *not* using |os| for a
@@ -117,7 +119,8 @@ class BisectCommandLineArgs(BaseCommandLineArgs):
         print args
         bisector = WarningBisector(args.good, args.bad, args.platform,
                                    args.warning, args.warning_limit,
-                                   args.warning_re, args.ignore_lines)
+                                   args.warning_re, args.ignore_lines,
+                                   args.required_test)
 
         # TODO(ER): Get the pushlog for bad, check for the file the warning is
         #           in in the changeset.
@@ -147,9 +150,11 @@ class BisectCommandLineArgs(BaseCommandLineArgs):
                             ' the line number of the warning has changed. Not so ' \
                             'useful if there are a lot of similar warnings in the ' \
                             'file.')
-        p.add_argument('--warning-limit', action='store', default=1000,
+        p.add_argument('--warning-limit', action='store', type=int, default=1000,
                        help='The threshold of warnings for going from good to ' \
                             'bad. Default: 1000.')
+        p.add_argument('--required-test', action='store', default=None,
+                       help='Test that must be present to compare revisions')
 
 
 class WarningTestRunner(TestRunner):
@@ -157,13 +162,15 @@ class WarningTestRunner(TestRunner):
     TestRunner to use in conjunction with bisection.
     """
     def __init__(self, warning, platform='linux64', ignore_lines=False,
-                 warning_re=WARNING_RE, warning_limit=1000):
+                 warning_re=WARNING_RE, warning_limit=1000,
+                 required_test=None):
         TestRunner.__init__(self)
         self.warning = warning
         self.warning_re = warning_re
         self.platform = platform
         self.ignore_lines = ignore_lines
         self.warning_limit = warning_limit
+        self.required_test = required_test or ""
 
     def check_for_move(self, repo, changeset):
         """
@@ -204,15 +211,18 @@ class WarningTestRunner(TestRunner):
         # Somewhat arbitrary, but we need to make sure there are enough tests
         # run in order to make a reasonable evaluation of the amount of
         # warnings present.
-        if len(files) < 100:
+        if len(files) < 20:
             # Tell the bisector to skip this build.
             print "Skipping build %s, not enough tests run" % build_info.changeset[:12]
             return 's'
 
         combined_warnings = Counter()
+        found_test = False
         for log in files:
             if log:
                 combined_warnings.update(log.warnings)
+                if not found_test:
+                    found_test = self.required_test in log.job_name
 
         if self.ignore_lines:
             normalized = re.match(r'^(.*), line [0-9]+$', self.warning).group(1)
@@ -226,9 +236,16 @@ class WarningTestRunner(TestRunner):
             total = combined_warnings[self.warning]
             print "%d - %s" % (total, self.warning)
 
+        if not found_test:
+            print "Skipping build %s, required test %s was not run" % (
+                    build_info.changeset[:12], self.required_test)
+            return 's'
+
         if total > self.warning_limit:
+            print "%d > %d" % (total, self.warning_limit)
             return 'b'
         else:
+            print "%d <= %d" % (total, self.warning_limit)
             return 'g'
 
     def run_once(self, build_info):

@@ -91,6 +91,7 @@ class FileCommandLineArgs(ReportCommandLineArgs):
         result = bz.create_bug(
                 summary, details, component=cmdline.component,
                 product=cmdline.product)
+        print result
         print "Filed bug %d" % result['id']
 
     def add_command(self, p):

@@ -144,6 +144,28 @@ def download_log(job, dest, repo, revision, warning_re):
 
     return parsed_log
 
+
+def add_log_urls_to_jobs(jobs, job_urls):
+    """
+    Helper that maps the results of a job_log_url query to the actual job
+    objects. It's possilbe for a job to have multiple logs, for now we
+    just choose the first one.
+    """
+    id_to_log = {}
+    for job_log in job_urls:
+        job_id = job_log['job_id']
+
+        # Only take the first log found for each job.
+        # Another option is to check the log name. For taskcluster builds at
+        # least this seems to be job_log['name'] == 'builds-4h'.
+        if not job_id in id_to_log:
+            id_to_log[job_id] = job_log['url']
+
+    # Now add the URL to the job object.
+    for job in jobs:
+        job['url'] = id_to_log[job['id']]
+
+
 def retrieve_test_logs(repo, revision, platform='linux64',
                        cache_dir=None, use_cache=True,
                        warning_re=WARNING_RE):
@@ -167,17 +189,19 @@ def retrieve_test_logs(repo, revision, platform='linux64',
             print "Cache file for %s not found" % warning_re
             print e
 
-    client = TreeherderClient(protocol='https', host='treeherder.mozilla.org')
+    client = TreeherderClient()
+    print "getting result set"
     result_set = client.get_resultsets(repo, revision=revision)
+    print "got result set"
     if not result_set:
         print "Failed to find %s in %s" % (revision, repo)
         return None
 
-    # We just want linux64 debug builds:
-    #   - platform='linux64'
-    #   - Crazytown param for debug: option_collection_hash
+    print "getting jobs"
     for x in range(5):
         try:
+            # option_collection_hash is just the convoluted way of specifying
+            # we want a debug build.
             jobs = client.get_jobs(repo,
                                    result_set_id=result_set[0]['id'],
                                    count=5000, # Just make this really large to avoid pagination
@@ -189,18 +213,30 @@ def retrieve_test_logs(repo, revision, platform='linux64',
 
     if not jobs:
         print "No jobs found for %s %s" % (revision, platform)
+        import traceback
+        traceback.print_exc()
         return None
 
-    # For now we need to determine the log urls one at a time to avoid
-    # angering the treeherder gods.
-    for job in jobs:
-        for x in range(5):
-            try:
-                job_log = client.get_job_log_url(repo, job_id=job['id'])
-                job['url'] = job_log[0]['url']
-                break
-            except requests.exceptions.ConnectionError:
-                pass
+    print "got jobs"
+
+    print "getting %d job log urls" % len(jobs)
+    job_ids = [ job['id'] for job in jobs ]
+    for x in range(5):
+        try:
+            job_logs = client.get_job_log_url(repo, job_id=job_ids)
+            break
+        except requests.exceptions.ConnectionError, e:
+            pass
+
+    if not job_logs:
+        print "Unable to retrieve log urls for %s %s" % (revision, platform)
+        import traceback
+        traceback.print_exc()
+        return None
+
+    add_log_urls_to_jobs(jobs, job_logs)
+
+    print "got job log urls"
 
     if cache_dir_exists:
         if not use_cache:

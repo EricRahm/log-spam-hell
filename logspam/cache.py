@@ -29,13 +29,19 @@ def normalize_line(line):
     line = re.sub(r'^[0-9:]+\s+INFO\s+-\s+', '', line)
     line = re.sub(r'^[0-9]+\s+INFO\s+', '', line)
     line = re.sub(r'^PROCESS \| [0-9]+ \| ', '', line)
+    #PID 13497 |  WARNING:
+    line = re.sub(r'^PID\s+[0-9]+\s+\|\s+', '', line)
     line = re.sub(r'\[(Child|Parent|GMP|NPAPI)?\s?[0-9]+\]', '', line)
     line = re.sub(r'/home/worker/workspace/build/src/', '', line)
     # Attempt buildbot paths, ie:
     #  c:/builds/moz2_slave/m-cen-w32-d-000000000000000000/build/src/
     line = re.sub(r'([a-z]:)?/builds/[^/]+/[^/]+/build/src/', '', line)
+    #  z:/build/build/src/
+    line = re.sub(r'([a-z]:)?/(build/)+src/', '', line)
     #blah=1caa2c00
     line = re.sub(r'=[a-z0-9]+', '=NNNNNN', line)
+    #GECKO(1265) |
+    line = re.sub(r'GECKO\([0-9]+\) \|', '', line)
     line = line.strip()
 
     return line

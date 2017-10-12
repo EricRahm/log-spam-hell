@@ -43,6 +43,8 @@ def normalize_line(line):
     #GECKO(1265) |
     line = re.sub(r'GECKO\([0-9]+\) \|', '', line)
     line = line.strip()
+    #[1355, Main Thread]
+    line = re.sub(r'^\[[^\]]+\]\s+', '', line)
 
     return line
 

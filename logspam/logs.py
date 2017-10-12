@@ -213,7 +213,8 @@ def retrieve_test_logs(repo, revision, platform='linux64',
                                    result_set_id=result_set[0]['id'],
                                    count=5000, # Just make this really large to avoid pagination
                                    platform=platform,
-                                   option_collection_hash=DEBUG_OPTIONHASH)
+                                   option_collection_hash=DEBUG_OPTIONHASH,
+                                   state='completed')
             break
         except requests.exceptions.ConnectionError:
             pass

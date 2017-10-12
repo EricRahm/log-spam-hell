@@ -196,6 +196,7 @@ def retrieve_test_logs(repo, revision, platform='linux64',
     client = TreeherderClient()
     print "getting result set"
     result_set = client.get_resultsets(repo, revision=revision)
+    print "result_set = client.get_resultsets('%s', revision='%s')" % (repo, revision)
     print "got result set"
     if not result_set:
         print "Failed to find %s in %s" % (revision, repo)
@@ -206,6 +207,8 @@ def retrieve_test_logs(repo, revision, platform='linux64',
         try:
             # option_collection_hash is just the convoluted way of specifying
             # we want a debug build.
+            print "jobs = client.get_jobs('%s',result_set_id=%d, count=5000, platform='%s', option_collection_hash='%s')" % (
+                    repo, result_set[0]['id'], platform, DEBUG_OPTIONHASH)
             jobs = client.get_jobs(repo,
                                    result_set_id=result_set[0]['id'],
                                    count=5000, # Just make this really large to avoid pagination
@@ -225,6 +228,7 @@ def retrieve_test_logs(repo, revision, platform='linux64',
 
     print "getting %d job log urls" % len(jobs)
     job_ids = [ job['id'] for job in jobs ]
+    print job_ids
     for x in range(5):
         try:
             job_logs = client.get_job_log_url(repo, job_id=job_ids)

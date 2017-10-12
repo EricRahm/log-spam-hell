@@ -163,7 +163,11 @@ def add_log_urls_to_jobs(jobs, job_urls):
 
     # Now add the URL to the job object.
     for job in jobs:
-        job['url'] = id_to_log[job['id']]
+        job_id = job['id']
+        if job_id in id_to_log:
+            job['url'] = id_to_log[job['id']]
+        else:
+            print "Missing job? %d" % job_id
 
 
 def retrieve_test_logs(repo, revision, platform='linux64',

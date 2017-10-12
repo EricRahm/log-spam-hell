@@ -52,11 +52,20 @@ class WarningBisector(object):
         # Also avoid overwriting the os module by *not* using |os| for a
         # variable name.
         (_os, bits) = re.match(r'([a-zA-Z]+)-?([0-9]+)?', platform).groups()
-        if not bits:
+        if not bits or bits not in (32, 64):
             bits = 32
+
+        # windows7-32
+        # windows7-32-vm
+        # win32
+        # win64
+        if '64' in platform:
+            bits = 64
 
         if _os.startswith('win'):
             _os = 'win'
+
+        print "_os = %s bits = %s" % (_os, bits)
 
         # TODO(ER): We might be able to ditch this.
         self.fetch_config = create_config('firefox', _os, int(bits))

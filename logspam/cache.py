@@ -167,6 +167,8 @@ class Cache(object):
                         "Cache file %s was corrupt", self.path)
 
             for x in raw_list:
+                if not x:
+                    continue
                 log = ParsedLog(x['url'], x['job_name'], x['fname'])
                 log.warnings.update(x['warnings'])
                 parsed_logs.append(log)

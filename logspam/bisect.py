@@ -73,7 +73,12 @@ class WarningBisector(object):
         self.fetch_config.set_repo('mozilla-central')
         self.fetch_config.set_build_type('debug')
 
-        self.bisector = Bisector(self.fetch_config, self.test_runner, None, False, None)
+        class FakeDownloadManager:
+            def focus_download(self, foo):
+                pass
+
+        dm = FakeDownloadManager()
+        self.bisector = Bisector(self.fetch_config, self.test_runner, dm, False, None)
 
     def bisect(self):
         if self.use_nightly:
@@ -220,7 +225,7 @@ class WarningTestRunner(TestRunner):
         # Somewhat arbitrary, but we need to make sure there are enough tests
         # run in order to make a reasonable evaluation of the amount of
         # warnings present.
-        if len(files) < 20:
+        if not files or len(files) < 20:
             # Tell the bisector to skip this build.
             print "Skipping build %s, not enough tests run" % build_info.changeset[:12]
             return 's'

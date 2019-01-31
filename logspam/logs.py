@@ -231,8 +231,11 @@ def retrieve_test_logs(repo, revision, platform='linux64',
     job_ids = [ job['id'] for job in jobs ]
     print job_ids
     for x in range(5):
+        logs = []
         try:
-            job_logs = client.get_job_log_url(repo, job_id=job_ids)
+            for y in range(0, len(job_ids), 100):
+                logs = logs + client.get_job_log_url(repo, job_id=job_ids[y:y+100])
+            job_logs = logs
             break
         except requests.exceptions.ConnectionError, e:
             pass

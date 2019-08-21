@@ -61,7 +61,8 @@ class Bugzilla:
             'description': desc,
             'op_sys': 'All',
             'platform': 'All',
-            'blocks': 'logspam'
+            'blocks': 'logspam',
+            'type': 'defect'
         })
 
         return r

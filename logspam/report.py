@@ -4,7 +4,7 @@
 
 from collections import Counter
 from logspam.cli import BaseCommandLineArgs
-from logspam.logs import (retrieve_test_logs, WarningInfo)
+from logspam.logs import (get_latest_revision, retrieve_test_logs, WarningInfo)
 import re
 
 class InvalidRegexException(Exception):
@@ -16,6 +16,10 @@ class WarningNotFoundException(Exception):
 class Warnings(object):
     def __init__(self, repo, revision, platform,
                  cache_dir, use_cache, warning_re):
+
+        if revision == "latest":
+            revision = get_latest_revision(repo)
+
         self.repo = repo
         self.revision = revision
         self.platform = platform

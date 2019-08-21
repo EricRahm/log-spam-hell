@@ -2,6 +2,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import datetime
+
 from collections import Counter
 from functools import partial
 
@@ -170,6 +172,26 @@ def add_log_urls_to_jobs(jobs, job_urls):
             job['url'] = id_to_log[job['id']]
         else:
             print "Missing job? %d" % job_id
+
+
+def get_latest_revision(repo):
+    """
+    Gets the latest revision pushed to the given repo.
+    """
+    client = TreeherderClient()
+    push_log = client.get_pushes(repo)
+
+    EPOCH = datetime.datetime(1970,1,1)
+    NOW_TS = (datetime.datetime.utcnow() - EPOCH).total_seconds()
+
+    # We need a push old enough that it probably is done testing
+    MIN_ELAPSED = datetime.timedelta(hours=3).total_seconds()
+    for push in push_log:
+        if NOW_TS - push['push_timestamp'] > MIN_ELAPSED:
+            print "revision %s is old enough" % push['revision']
+            return push['revision']
+
+    return
 
 
 def retrieve_test_logs(repo, revision, platform='linux64',

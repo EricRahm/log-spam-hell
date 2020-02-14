@@ -120,7 +120,7 @@ class WarningInfo:
         details.append("```")
         details.append("[1] %s" % link)
 
-        return (summary, "\n".join(details))
+        return (summary, "\n".join(details), self.file)
 
 def download_log(job, dest, repo, revision, warning_re):
     """
@@ -273,6 +273,7 @@ def retrieve_test_logs(repo, revision, platform='linux64',
     add_log_urls_to_jobs(jobs, job_logs)
 
     print "got job log urls"
+    print "%s" % jobs
 
     if cache_dir_exists:
         if not use_cache:

@@ -81,7 +81,7 @@ class ReportCommandLineArgs(BaseCommandLineArgs):
         if not cmdline.warning:
             warnings.top(cmdline.warning_count, cmdline.reverse)
         else:
-            (summary, details) = warnings.details(cmdline.warning, cmdline.test_summary_count)
+            (summary, details, _) = warnings.details(cmdline.warning, cmdline.test_summary_count)
             print "\n".join([summary, "", details])
 
     def add_command(self, p):

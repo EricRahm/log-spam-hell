@@ -3,8 +3,11 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import ConfigParser
+import json
 import os
 import requests
+import subprocess
+
 from logspam.report import (
         ReportCommandLineArgs,
         Warnings,
@@ -13,6 +16,14 @@ from logspam.report import (
 
 #BUGZILLA_API='https://landfill.bugzilla.org/bugzilla-5.0-branch/rest'
 BUGZILLA_API='https://bugzilla.mozilla.org/rest'
+
+def get_component_info(hgroot, path):
+    p = subprocess.Popen([os.path.join(hgroot, 'mach'), 'file-info', 'bugzilla-component', '--format', 'json', path],
+                         shell=False, cwd=hgroot, stdout=subprocess.PIPE)
+    (out, err) = p.communicate()
+    mappings = json.loads(out)
+    return mappings[path]
+
 
 class Bugzilla:
     """
@@ -75,7 +86,7 @@ class FileCommandLineArgs(ReportCommandLineArgs):
                             cmdline.warning_re)
 
         try:
-            (summary, details) = warnings.details(cmdline.warning, cmdline.test_summary_count)
+            (summary, details, path) = warnings.details(cmdline.warning, cmdline.test_summary_count)
         except WarningNotFoundException:
             print "There are zero warnings matching %s" % cmdline.warning
             print "Not filing bug!"
@@ -89,9 +100,23 @@ class FileCommandLineArgs(ReportCommandLineArgs):
             print e
             return
 
+        if not cmdline.component:
+            # Try to figure it out.
+            try:
+                (product, component) = get_component_info(cmdline.hgroot, path)
+            except Exception as e:
+                print "Couldn't figure out the component for '%s'. Please " \
+                      "specify it with --component" % path
+                return
+
+            print "Guessed %s :: %s - %s" % (product, component, path)
+        else:
+            product = cmdline.product
+            component = cmdline.component
+
         result = bz.create_bug(
-                summary, details, component=cmdline.component,
-                product=cmdline.product)
+                summary, details, component=component,
+                product=product)
         print result
         print "Filed bug %d" % result['id']
 
@@ -107,10 +132,14 @@ class FileCommandLineArgs(ReportCommandLineArgs):
         """
         super(FileCommandLineArgs, self).add_arguments(p)
 
-        p.add_argument('--component', action='store', default=None,
-                       required=True,
+        g = p.add_mutually_exclusive_group(required=True)
+        g.add_argument('--component', action='store', default=None,
                        help='Component to file the bug in.')
+        g.add_argument('--hgroot', action='store', default=None,
+                       help='local mozilla repo to use for mapping components')
+
         p.add_argument('--product', action='store', default='Core',
                        help='Product to file the bug in. Default: Core')
         p.add_argument('--api-key', action='store', default=None,
                        help='The API key to use when creating the bug. Default: extracted from .hgrc')
+

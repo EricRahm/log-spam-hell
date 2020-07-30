@@ -10,6 +10,7 @@ from functools import partial
 from logspam import WARNING_RE
 import logspam.cache
 
+import json
 from multiprocessing import Pool
 import os
 import re
@@ -67,6 +68,19 @@ class WarningInfo:
 
             with open(os.path.join(cache_dir, log.fname), 'r') as f:
                 for line in f:
+                    # For structured logs the test start info is contained in a
+                    # JSON blob. Try to extract it here and fall back to a
+                    # regex if it doesn't work.
+                    try:
+                        json_line = json.loads(line)
+                        if 'action' in json_line and json_line['action'] == \
+                        'test_start':
+                            curr_test = e10s_prefix + json_line['test']
+                        else:
+                            line = json_line['data']
+                    except:
+                        pass
+
                     # Check if this is the beginning of a new test.
                     m = re.search('TEST-START \| (.*)', line)
                     if m:
@@ -136,7 +150,16 @@ def download_log(job, dest, repo, revision, warning_re):
     print("Downloading log for %s %d" % (job_name, job_id))
 
     try:
+        # TODO(ER): We could cleanup log name handling.
         job_log_url = job['url']
+
+        # For some jobs errorssummary.log is now the default, but that doesn't
+        # include gecko warnings. Switch over to the raw log.
+        if 'errorsummary.log' in job_log_url:
+            job_log_url = re.sub('errorsummary', 'raw', job_log_url)
+
+        print("job_log_url = %s" % job_log_url)
+
     except:
         print("Couldn't determine job log URL for %s" % job_name)
         return None

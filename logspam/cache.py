@@ -23,6 +23,16 @@ def normalize_line(line):
       - trims file paths
       - stuff that looks like a pointer address
     """
+    line = line.decode('utf-8')
+    try:
+        # Raw logs are now encoded in json
+        json_line = json.loads(line)
+        line = json_line['data']
+    except:
+        # Legacy logs may be plain text, particularly if live_backing.log is
+        # specified.
+        pass
+
     # taskcluster prefixing:
     #   [task 2016-09-20T11:09:35.539828Z] 11:09:35
     line = re.sub(r'^\[task[^\]]+\]\s', '', line)
@@ -33,6 +43,7 @@ def normalize_line(line):
     line = re.sub(r'^PID\s+[0-9]+\s+\|\s+', '', line)
     line = re.sub(r'\[(Child|Parent|GMP|NPAPI)?\s?[0-9]+\]', '', line)
     line = re.sub(r'/home/worker/workspace/build/src/', '', line)
+    line = re.sub(r'/builds/worker/checkouts/gecko/', '', line)
     # Attempt buildbot paths, ie:
     #  c:/builds/moz2_slave/m-cen-w32-d-000000000000000000/build/src/
     line = re.sub(r'([a-z]:)?/builds/[^/]+/[^/]+/build/src/', '', line)
@@ -155,7 +166,7 @@ class Cache(object):
             raise CacheFileNotFoundException(
                     "Cache file %s not found" % self.path)
 
-        print("Reading cache from %s" % self.path)
+        print(("Reading cache from %s" % self.path))
         parsed_logs = []
         with open(self.path, 'r') as f:
             try:

@@ -20,9 +20,9 @@ setup(
     ],
     packages=["logspam"],
     install_requires=[
-      "mozregression",
-      "requests",
-      "treeherder-client>=3.0",
+      "mozregression>=4.0,<4.1",
+      "requests>=2.24,<2.25",
+      "treeherder-client>=5.0,<5.1",
     ],
     entry_points={
       'console_scripts': ['log_spam=logspam.cli_entry:main']

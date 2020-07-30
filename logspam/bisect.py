@@ -65,7 +65,7 @@ class WarningBisector(object):
         if _os.startswith('win'):
             _os = 'win'
 
-        print "_os = %s bits = %s" % (_os, bits)
+        print("_os = %s bits = %s" % (_os, bits))
 
         # TODO(ER): We might be able to ditch this.
         self.fetch_config = create_config('firefox', _os, int(bits))
@@ -88,18 +88,18 @@ class WarningBisector(object):
 
         (good, bad) = result
         if self.test_runner.check_for_move(self.fetch_config.repo, good):
-            print "You should probably try bisecting again from the good revision"
+            print("You should probably try bisecting again from the good revision")
 
-        print "Done bisecting I guess"
+        print("Done bisecting I guess")
         return result
 
     def bisect_nightly(self):
         handler = NightlyHandler(ensure_good_and_bad=True)
         result = self.bisector.bisect(handler, self.good, self.bad)
         if result == Bisection.FINISHED:
-            print "Got as far as we can go bisecting nightlies..."
+            print("Got as far as we can go bisecting nightlies...")
             handler.print_range()
-            print "Switching bisection method to taskcluster"
+            print("Switching bisection method to taskcluster")
             result = self.bisect_inbound(handler.good_revision, handler.bad_revision)
         else:
             # TODO(ER): maybe this should be an exception...
@@ -113,7 +113,7 @@ class WarningBisector(object):
         handler = InboundHandler()
         result = self.bisector.bisect(handler, good_rev, bad_rev, expand=0)
         if result == Bisection.FINISHED:
-            print "No more m-c revisions :("
+            print("No more m-c revisions :(")
             handler.print_range()
             # Try switching over to the integration branch.
             if len(handler.build_range) == 2:
@@ -129,8 +129,8 @@ class WarningBisector(object):
 class BisectCommandLineArgs(BaseCommandLineArgs):
     @staticmethod
     def do_bisect(args):
-        print "do_bisect called"
-        print args
+        print("do_bisect called")
+        print(args)
         bisector = WarningBisector(args.good, args.bad, args.platform,
                                    args.warning, args.warning_limit,
                                    args.warning_re, args.ignore_lines,
@@ -204,15 +204,15 @@ class WarningTestRunner(TestRunner):
 
         possible_move_found = False
         normalized = re.match(r'^(.*), line [0-9]+$', self.warning).group(1)
-        for (k, v) in combined_warnings.iteritems():
+        for (k, v) in combined_warnings.items():
             if k.startswith(normalized) and v > self.warning_limit:
-                print "Possible line move:\n  %d - %s" % (v, k)
+                print("Possible line move:\n  %d - %s" % (v, k))
                 possible_move_found = True
 
         if possible_move_found:
             jp = JsonPushes(repo)
             push = jp.push(changeset)
-            print "Try this date: %s" % push.utc_date
+            print("Try this date: %s" % push.utc_date)
 
 
         return possible_move_found
@@ -227,7 +227,7 @@ class WarningTestRunner(TestRunner):
         # warnings present.
         if not files or len(files) < 20:
             # Tell the bisector to skip this build.
-            print "Skipping build %s, not enough tests run" % build_info.changeset[:12]
+            print("Skipping build %s, not enough tests run" % build_info.changeset[:12])
             return 's'
 
         combined_warnings = Counter()
@@ -242,24 +242,24 @@ class WarningTestRunner(TestRunner):
             normalized = re.match(r'^(.*), line [0-9]+$', self.warning).group(1)
 
             total = 0
-            for (k, v) in combined_warnings.iteritems():
+            for (k, v) in combined_warnings.items():
                 if k.startswith(normalized):
                     total += v
-            print "%d - %s" % (total, normalized)
+            print("%d - %s" % (total, normalized))
         else:
             total = combined_warnings[self.warning]
-            print "%d - %s" % (total, self.warning)
+            print("%d - %s" % (total, self.warning))
 
         if not found_test:
-            print "Skipping build %s, required test %s was not run" % (
-                    build_info.changeset[:12], self.required_test)
+            print("Skipping build %s, required test %s was not run" % (
+                    build_info.changeset[:12], self.required_test))
             return 's'
 
         if total > self.warning_limit:
-            print "%d > %d" % (total, self.warning_limit)
+            print("%d > %d" % (total, self.warning_limit))
             return 'b'
         else:
-            print "%d <= %d" % (total, self.warning_limit)
+            print("%d <= %d" % (total, self.warning_limit))
             return 'g'
 
     def run_once(self, build_info):

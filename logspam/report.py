@@ -38,8 +38,8 @@ class Warnings(object):
             self.combined_warnings.update(log.warnings)
 
     def top(self, warning_count, reverse=False):
-        print "Top %d Warnings" % warning_count
-        print "==============="
+        print("Top %d Warnings" % warning_count)
+        print("===============")
         most_common = self.combined_warnings.most_common()
 
         if reverse:
@@ -48,9 +48,9 @@ class Warnings(object):
             warnings_list = most_common[:warning_count]
 
         for (warning, count) in warnings_list:
-            print "%6d %s" % (count, warning)
+            print("%6d %s" % (count, warning))
 
-        print "TOTAL WARNINGS: %d" % sum(self.combined_warnings.values())
+        print("TOTAL WARNINGS: %d" % sum(self.combined_warnings.values()))
 
     def details(self, warning, test_summary_count):
         # Sanity check the warning format.
@@ -82,7 +82,7 @@ class ReportCommandLineArgs(BaseCommandLineArgs):
             warnings.top(cmdline.warning_count, cmdline.reverse)
         else:
             (summary, details, _) = warnings.details(cmdline.warning, cmdline.test_summary_count)
-            print "\n".join([summary, "", details])
+            print("\n".join([summary, "", details]))
 
     def add_command(self, p):
        parser = p.add_parser('report',

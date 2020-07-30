@@ -155,7 +155,7 @@ class Cache(object):
             raise CacheFileNotFoundException(
                     "Cache file %s not found" % self.path)
 
-        print "Reading cache from %s" % self.path
+        print("Reading cache from %s" % self.path)
         parsed_logs = []
         with open(self.path, 'r') as f:
             try:

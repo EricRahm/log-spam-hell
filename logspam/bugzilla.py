@@ -2,7 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import ConfigParser
+import configparser
 import json
 import os
 import requests
@@ -33,7 +33,7 @@ class Bugzilla:
         self.host = host
 
         if not api_key:
-            cfg = ConfigParser.ConfigParser()
+            cfg = configparser.ConfigParser()
             cfg.read(os.path.join(os.path.expanduser('~'), '.hgrc'))
             api_key = cfg.get('bugzilla', 'apikey')
 
@@ -88,16 +88,16 @@ class FileCommandLineArgs(ReportCommandLineArgs):
         try:
             (summary, details, path) = warnings.details(cmdline.warning, cmdline.test_summary_count)
         except WarningNotFoundException:
-            print "There are zero warnings matching %s" % cmdline.warning
-            print "Not filing bug!"
+            print("There are zero warnings matching %s" % cmdline.warning)
+            print("Not filing bug!")
             return
 
         try:
             bz = Bugzilla(BUGZILLA_API, cmdline.api_key)
         except Exception as e:
-            print "I'm sorry, I couldn't guess your api key. Please " \
-                  "specify it with --api_key"
-            print e
+            print("I'm sorry, I couldn't guess your api key. Please " \
+                  "specify it with --api_key")
+            print(e)
             return
 
         if not cmdline.component:
@@ -105,11 +105,11 @@ class FileCommandLineArgs(ReportCommandLineArgs):
             try:
                 (product, component) = get_component_info(cmdline.hgroot, path)
             except Exception as e:
-                print "Couldn't figure out the component for '%s'. Please " \
-                      "specify it with --component" % path
+                print("Couldn't figure out the component for '%s'. Please " \
+                      "specify it with --component" % path)
                 return
 
-            print "Guessed %s :: %s - %s" % (product, component, path)
+            print("Guessed %s :: %s - %s" % (product, component, path))
         else:
             product = cmdline.product
             component = cmdline.component
@@ -117,8 +117,8 @@ class FileCommandLineArgs(ReportCommandLineArgs):
         result = bz.create_bug(
                 summary, details, component=component,
                 product=product)
-        print result
-        print "Filed bug %d" % result['id']
+        print(result)
+        print("Filed bug %d" % result['id'])
 
     def add_command(self, p):
        parser = p.add_parser('file',

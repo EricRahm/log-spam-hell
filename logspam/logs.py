@@ -80,12 +80,12 @@ class WarningInfo:
                         # For some reason doing |self.full_text in line| blows
                         # up when unicode strings are in the line. For now
                         # switch to regex which hopefully isn't too slow.
-                        print "Can't read line:\n  %s" % line
+                        print("Can't read line:\n  %s" % line)
 
             if not curr_test:
-                print "No test names matched?"
+                print("No test names matched?")
             elif not self.tests:
-                print "No warnings matched?"
+                print("No warnings matched?")
 
     def details(self, repo, revision, platform='linux64', test_count=10):
         """
@@ -133,17 +133,17 @@ def download_log(job, dest, repo, revision, warning_re):
     if job['job_type_symbol']:
         job_name += " " + job['job_type_symbol'] # Needed for jobs without unique names
 
-    print "Downloading log for %s %d" % (job_name, job_id)
+    print("Downloading log for %s %d" % (job_name, job_id))
 
     try:
         job_log_url = job['url']
     except:
-        print "Couldn't determine job log URL for %s" % job_name
+        print("Couldn't determine job log URL for %s" % job_name)
         return None
 
     parsed_log = logspam.cache.ParsedLog(url=job_log_url, job_name=job_name)
     if not parsed_log.download(dest, warning_re):
-        print "Couldn't download log URL for %s" % job_name
+        print("Couldn't download log URL for %s" % job_name)
         return None
 
     return parsed_log
@@ -171,7 +171,7 @@ def add_log_urls_to_jobs(jobs, job_urls):
         if job_id in id_to_log:
             job['url'] = id_to_log[job['id']]
         else:
-            print "Missing job? %d" % job_id
+            print("Missing job? %d" % job_id)
 
 
 def get_latest_revision(repo):
@@ -188,7 +188,7 @@ def get_latest_revision(repo):
     MIN_ELAPSED = datetime.timedelta(hours=3).total_seconds()
     for push in push_log:
         if NOW_TS - push['push_timestamp'] > MIN_ELAPSED:
-            print "revision %s is old enough" % push['revision']
+            print("revision %s is old enough" % push['revision'])
             return push['revision']
 
     return
@@ -210,29 +210,29 @@ def retrieve_test_logs(repo, revision, platform='linux64',
     cache_dir_exists = os.path.isdir(cache_dir)
     if cache_dir_exists and use_cache:
         # We already have logs for this revision.
-        print "Using cached data"
+        print("Using cached data")
         try:
             return cache.read_results()
         except logspam.cache.CacheFileNotFoundException as e:
-            print "Cache file for %s not found" % warning_re
-            print e
+            print("Cache file for %s not found" % warning_re)
+            print(e)
 
     client = TreeherderClient()
-    print "getting result set"
+    print("getting result set")
     pushes = client.get_pushes(repo, revision=revision)
-    print "pushes = client.get_pushes('%s', revision='%s')" % (repo, revision)
-    print "got pushes"
+    print("pushes = client.get_pushes('%s', revision='%s')" % (repo, revision))
+    print("got pushes")
     if not pushes:
-        print "Failed to find %s in %s" % (revision, repo)
+        print("Failed to find %s in %s" % (revision, repo))
         return None
 
-    print "getting jobs"
+    print("getting jobs")
     for x in range(5):
         try:
             # option_collection_hash is just the convoluted way of specifying
             # we want a debug build.
-            print "jobs = client.get_jobs('%s',result_set_id=%d, count=5000, platform='%s', option_collection_hash='%s')" % (
-                    repo, pushes[0]['id'], platform, DEBUG_OPTIONHASH)
+            print("jobs = client.get_jobs('%s',result_set_id=%d, count=5000, platform='%s', option_collection_hash='%s')" % (
+                    repo, pushes[0]['id'], platform, DEBUG_OPTIONHASH))
             jobs = client.get_jobs(repo,
                                    result_set_id=pushes[0]['id'],
                                    count=5000, # Just make this really large to avoid pagination
@@ -244,16 +244,16 @@ def retrieve_test_logs(repo, revision, platform='linux64',
             pass
 
     if not jobs:
-        print "No jobs found for %s %s" % (revision, platform)
+        print("No jobs found for %s %s" % (revision, platform))
         import traceback
         traceback.print_exc()
         return None
 
-    print "got jobs"
+    print("got jobs")
 
-    print "getting %d job log urls" % len(jobs)
+    print("getting %d job log urls" % len(jobs))
     job_ids = [ job['id'] for job in jobs ]
-    print job_ids
+    print(job_ids)
     for x in range(5):
         logs = []
         try:
@@ -261,19 +261,19 @@ def retrieve_test_logs(repo, revision, platform='linux64',
                 logs = logs + client.get_job_log_url(repo, job_id=job_ids[y:y+100])
             job_logs = logs
             break
-        except requests.exceptions.ConnectionError, e:
+        except requests.exceptions.ConnectionError as e:
             pass
 
     if not job_logs:
-        print "Unable to retrieve log urls for %s %s" % (revision, platform)
+        print("Unable to retrieve log urls for %s %s" % (revision, platform))
         import traceback
         traceback.print_exc()
         return None
 
     add_log_urls_to_jobs(jobs, job_logs)
 
-    print "got job log urls"
-    print "%s" % jobs
+    print("got job log urls")
+    print("%s" % jobs)
 
     if cache_dir_exists:
         if not use_cache:

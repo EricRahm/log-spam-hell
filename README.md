@@ -147,3 +147,23 @@ optional arguments:
   --required-test REQUIRED_TEST
                         Test that must be present to compare revisions
 ```
+
+## Developers
+
+### Configuration
+I highly suggest working in a virtualenv, manage that however you prefer. We now use Python3.
+
+
+To setup for development:
+```
+git clone https://github.com/EricRahm/log-spam-hell.git
+cd log-spam-hell
+virtualenv venv
+source venv/bin/activate
+pip3 install -e .
+```
+### Common issues
+- *Normalizing paths* The paths in warnings are actually absolute paths. We normalize them so they're relative to a normal source checkout. This often breaks when releng changes build machine configurations so you'll have to update the [normalize_line function](logspam/cache.py).
+- *Platform names* We occosionally change the name of a platform, if you see very few results go over to treeherder, select the test you're interested in, and check out what the platform name is in the job description.
+- *Log format* The default log that gets returned and the format it is in can change as well. You can look at the log artifact in treeherder to get an idea of what's changed.
+

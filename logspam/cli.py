@@ -13,8 +13,8 @@ class BaseCommandLineArgs(object):
         """
         Adds command-line arguments for the given argparser.
         """
-        p.add_argument('--platform', action='store', default='linux64',
-                       help='Platform to get logs for. Default: linux64')
+        p.add_argument('--platform', action='store', default='linux1804-64',
+                       help='Platform to get logs for. Default: linux1804-64')
         p.add_argument('--warning-re', action='store', default=WARNING_RE,
                        help='Regex used to match lines. Can be used to match ' \
                             'debug messages that are not proper warnings.')

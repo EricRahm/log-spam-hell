@@ -9,10 +9,10 @@ from logspam.cli import BaseCommandLineArgs
 from logspam.logs import retrieve_test_logs
 
 from mozregression.bisector import (
-    Bisector, Bisection, NightlyHandler, InboundHandler)
+    Bisector, Bisection, NightlyHandler, IntegrationHandler)
 from mozregression.dates import parse_date
 from mozregression.errors import DateFormatError
-from mozregression.fetch_build_info import InboundInfoFetcher
+from mozregression.fetch_build_info import IntegrationInfoFetcher
 from mozregression.fetch_configs import create_config
 from mozregression.json_pushes import JsonPushes
 from mozregression.log import init_logger
